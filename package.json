@@ -1,0 +1,11 @@
+{
+  "name": "csr-ps-report-app",
+  "version": "1.0.0",
+  "description": "A simple web UI for running a PowerShell script.",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "author": "",
+  "license": "ISC"
+}
