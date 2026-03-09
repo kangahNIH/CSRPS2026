@@ -71,7 +71,11 @@ app.get('/api/reports', async (req, res) => {
         res.status(200).json(reports);
     } catch (err) {
         console.error("Failed to list blobs:", err.message);
-        res.status(500).json({ message: 'Failed to retrieve reports.' });
+        res.status(500).json({ 
+            message: 'Failed to retrieve reports.',
+            error: err.message,
+            code: err.code
+        });
     }
 });
 
@@ -101,7 +105,10 @@ app.get('/api/download-report/:name', async (req, res) => {
         res.json({ url: sasUrl });
     } catch (err) {
         console.error("Failed to generate SAS URL:", err.message);
-        res.status(500).json({ message: 'Failed to generate download link.' });
+        res.status(500).json({ 
+            message: 'Failed to generate download link.',
+            error: err.message
+        });
     }
 });
 
@@ -124,7 +131,11 @@ app.get('/api/status/:id', async (req, res) => {
         
         res.json(statusData);
     } catch (err) {
-        res.status(500).json({ status: 'Error', message: 'Failed to fetch status.' });
+        res.status(500).json({ 
+            status: 'Error', 
+            message: 'Failed to fetch status.',
+            error: err.message
+        });
     }
 });
 
@@ -165,7 +176,11 @@ app.post('/api/submit-groups', async (req, res) => {
         console.error("--- QUEUE SUBMISSION ERROR ---");
         console.error("Error Message:", err.message);
         console.error("Error Code:", err.code || "N/A");
-        res.status(500).json({ message: 'Failed to process request.' });
+        res.status(500).json({ 
+            message: 'Failed to process request.',
+            error: err.message,
+            code: err.code
+        });
     }
 });
 
