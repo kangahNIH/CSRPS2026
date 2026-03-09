@@ -31,6 +31,18 @@ try {
 app.use(bodyParser.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
+// API Endpoint: Health Check (Diagnostic)
+app.get('/api/health', (req, res) => {
+    const health = {
+        nodeVersion: process.version,
+        envVariableFound: !!process.env.AZURE_STORAGE_CONNECTION_STRING,
+        queueClientInitialized: !!queueClient,
+        blobClientInitialized: !!blobServiceClient,
+        timestamp: new Date().toISOString()
+    };
+    res.json(health);
+});
+
 // API Endpoint: Get list of reports
 app.get('/api/reports', async (req, res) => {
     if (!blobServiceClient) {
