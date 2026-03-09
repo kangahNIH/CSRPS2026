@@ -15,12 +15,16 @@ const containerName = "reports";
 let queueClient = null;
 let blobServiceClient = null;
 
-if (connectionString) {
-    queueClient = new QueueClient(connectionString, queueName);
-    blobServiceClient = BlobServiceClient.fromConnectionString(connectionString);
-    console.log(`Storage clients initialized for: Queue(${queueName}) and Blob(${containerName})`);
-} else {
-    console.warn("WARNING: AZURE_STORAGE_CONNECTION_STRING environment variable is not set.");
+try {
+    if (connectionString) {
+        queueClient = new QueueClient(connectionString, queueName);
+        blobServiceClient = BlobServiceClient.fromConnectionString(connectionString);
+        console.log(`Storage clients initialized for: Queue(${queueName}) and Blob(${containerName})`);
+    } else {
+        console.warn("WARNING: AZURE_STORAGE_CONNECTION_STRING environment variable is not set.");
+    }
+} catch (err) {
+    console.error("CRITICAL: Failed to initialize Azure Storage clients. Check your connection string format.", err.message);
 }
 
 // Middleware
