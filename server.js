@@ -1,3 +1,4 @@
+console.log("--- NODE SERVER STARTING ---");
 const express = require('express');
 const bodyParser = require('body-parser');
 const path = require('path');
@@ -6,6 +7,9 @@ const { BlobServiceClient, generateBlobSASQueryParameters, BlobSASPermissions, S
 
 const app = express();
 const port = process.env.PORT || 3000;
+
+console.log("Environment check: PORT =", port);
+console.log("Environment check: CONNECTION_STRING present =", !!process.env.AZURE_STORAGE_CONNECTION_STRING);
 
 // Azure Storage Configuration
 const connectionString = process.env.AZURE_STORAGE_CONNECTION_STRING;
