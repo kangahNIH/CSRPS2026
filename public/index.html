@@ -364,14 +364,15 @@
                     statusDiv.textContent = 'Request submitted successfully! Tracking progress below...';
                     statusDiv.className = 'success';
                     
-                    // Start polling for progress
                     if (data.requestId) {
                         if (pollInterval) clearInterval(pollInterval);
-                        pollStatus(data.requestId); // Run immediately
+                        pollStatus(data.requestId);
                         pollInterval = setInterval(() => pollStatus(data.requestId), 5000);
                     }
                 } else {
-                    statusDiv.textContent = 'Error: ' + (data.message || 'Something went wrong.');
+                    // SHOW DETAILED ERROR
+                    const reason = data.error ? ` (${data.error})` : '';
+                    statusDiv.textContent = 'Error: ' + (data.message || 'Submission failed') + reason;
                     statusDiv.className = 'error';
                 }
             } catch (err) {
