@@ -109,15 +109,123 @@
             display: block;
         }
 
+        /* Status Tracker Styles */
+        .status-tracker {
+            margin-top: 1.5rem;
+            padding: 1.5rem;
+            background-color: #f8f9fa;
+            border-left: 4px solid var(--primary);
+            border-radius: 4px;
+            display: none;
+        }
+
+        .status-tracker h3 {
+            margin-top: 0;
+            font-size: 1rem;
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .status-badge {
+            font-size: 0.75rem;
+            padding: 2px 8px;
+            border-radius: 10px;
+            background: var(--primary);
+            color: white;
+            text-transform: uppercase;
+        }
+
+        .status-msg {
+            font-size: 0.9rem;
+            margin: 10px 0;
+            color: #323130;
+        }
+
+        .status-time {
+            font-size: 0.7rem;
+            color: #605e5c;
+        }
+
+        .status-failed {
+            border-left-color: #a4262c;
+        }
+        
+        .status-failed .status-badge {
+            background-color: #a4262c;
+        }
+
         .hint {
             font-size: 0.8rem;
             color: #605e5c;
             margin-top: 0.5rem;
         }
+
+        /* Reports Section Styles */
+        .reports-section {
+            margin-top: 2rem;
+            border-top: 1px solid #edebe9;
+            padding-top: 1.5rem;
+        }
+
+        .reports-section h2 {
+            font-size: 1.2rem;
+            margin-bottom: 1rem;
+            color: var(--text);
+        }
+
+        .report-list {
+            list-style: none;
+            padding: 0;
+            max-height: 250px;
+            overflow-y: auto;
+        }
+
+        .report-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px;
+            border-bottom: 1px solid #f3f2f1;
+            font-size: 0.9rem;
+        }
+
+        .report-info {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .report-date {
+            font-size: 0.75rem;
+            color: #605e5c;
+        }
+
+        .download-link {
+            color: var(--primary);
+            text-decoration: none;
+            font-weight: 600;
+            cursor: pointer;
+        }
+
+        .download-link:hover {
+            text-decoration: underline;
+        }
+
+        .refresh-btn:hover {
+            text-decoration: underline;
+        }
+
+        .version-tag {
+            font-size: 0.7rem;
+            color: #a1a1a1;
+            text-align: right;
+            margin-bottom: 0.5rem;
+            display: block;
+        }
     </style>
 </head>
 <body>
     <div class="container">
+        <span class="version-tag">v.2026-03-09-version1</span>
         <h1>Member Retrieval</h1>
         <p>Enter the names of the Active Directory groups you want to query for member details.</p>
         
@@ -131,9 +239,105 @@
         </form>
 
         <div id="status"></div>
+
+        <!-- Active Request Status Tracker -->
+        <div id="statusTracker" class="status-tracker">
+            <h3>Current Request <span id="trackerBadge" class="status-badge">Pending</span></h3>
+            <div id="trackerMsg" class="status-msg">Waiting for Jump Server to pick up request...</div>
+            <div id="trackerTime" class="status-time"></div>
+        </div>
+
+        <!-- New Reports Section -->
+        <div class="reports-section">
+            <div style="display: flex; justify-content: space-between; align-items: baseline;">
+                <h2>Completed Reports</h2>
+                <button class="refresh-btn" onclick="fetchReports()">Refresh List</button>
+            </div>
+            <ul id="reportList" class="report-list">
+                <li class="report-item">Loading reports...</li>
+            </ul>
+        </div>
     </div>
 
     <script>
+        let pollInterval = null;
+
+        async function pollStatus(requestId) {
+            const tracker = document.getElementById('statusTracker');
+            const badge = document.getElementById('trackerBadge');
+            const msg = document.getElementById('trackerMsg');
+            const time = document.getElementById('trackerTime');
+
+            tracker.style.display = 'block';
+            tracker.classList.remove('status-failed');
+
+            try {
+                const response = await fetch(`/api/status/${requestId}`);
+                const data = await response.json();
+
+                badge.textContent = data.status;
+                msg.textContent = data.message;
+                if (data.timestamp) time.textContent = 'Last update: ' + data.timestamp;
+
+                if (data.status === 'Failed') {
+                    tracker.classList.add('status-failed');
+                    clearInterval(pollInterval);
+                } else if (data.status === 'Completed') {
+                    clearInterval(pollInterval);
+                    fetchReports(); // Refresh the file list
+                }
+            } catch (err) {
+                console.error('Polling error:', err);
+            }
+        }
+
+        // Fetch and display the list of reports
+        async function fetchReports() {
+            const reportList = document.getElementById('reportList');
+            try {
+                const response = await fetch('/api/reports');
+                const reports = await response.json();
+
+                if (reports.length === 0) {
+                    reportList.innerHTML = '<li class="report-item">No reports found yet.</li>';
+                    return;
+                }
+
+                reportList.innerHTML = '';
+                reports.forEach(report => {
+                    const date = new Date(report.createdOn).toLocaleString();
+                    const li = document.createElement('li');
+                    li.className = 'report-item';
+                    li.innerHTML = `
+                        <div class="report-info">
+                            <span>${report.name}</span>
+                            <span class="report-date">${date}</span>
+                        </div>
+                        <a class="download-link" onclick="downloadReport('${report.name}')">Download</a>
+                    `;
+                    reportList.appendChild(li);
+                });
+            } catch (err) {
+                reportList.innerHTML = '<li class="report-item" style="color: red;">Failed to load reports.</li>';
+            }
+        }
+
+        // Generate SAS URL and trigger download
+        async function downloadReport(name) {
+            try {
+                const response = await fetch(`/api/download-report/${encodeURIComponent(name)}`);
+                const data = await response.json();
+                if (data.url) {
+                    window.open(data.url, '_blank');
+                }
+            } catch (err) {
+                alert('Failed to generate download link.');
+            }
+        }
+
+        // Load reports on page load
+        fetchReports();
+
         document.getElementById('groupForm').addEventListener('submit', async (e) => {
             e.preventDefault();
             const submitBtn = document.getElementById('submitBtn');
@@ -157,8 +361,15 @@
                 const data = await response.json();
 
                 if (response.ok) {
-                    statusDiv.textContent = 'Request submitted successfully! The Jump Server will process the groups soon.';
+                    statusDiv.textContent = 'Request submitted successfully! Tracking progress below...';
                     statusDiv.className = 'success';
+                    
+                    // Start polling for progress
+                    if (data.requestId) {
+                        if (pollInterval) clearInterval(pollInterval);
+                        pollStatus(data.requestId); // Run immediately
+                        pollInterval = setInterval(() => pollStatus(data.requestId), 5000);
+                    }
                 } else {
                     statusDiv.textContent = 'Error: ' + (data.message || 'Something went wrong.');
                     statusDiv.className = 'error';
