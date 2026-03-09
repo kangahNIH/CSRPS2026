@@ -36,7 +36,6 @@ jobs:
           path: |
             .
             ! .git
-            ! node_modules
 
   deploy:
     runs-on: ubuntu-latest
