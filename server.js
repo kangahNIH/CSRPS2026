@@ -162,6 +162,9 @@ app.post('/api/submit-groups', async (req, res) => {
             requestId: requestId
         });
     } catch (err) {
+        console.error("--- QUEUE SUBMISSION ERROR ---");
+        console.error("Error Message:", err.message);
+        console.error("Error Code:", err.code || "N/A");
         res.status(500).json({ message: 'Failed to process request.' });
     }
 });
