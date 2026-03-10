@@ -127,9 +127,16 @@ app.get('/api/status/:id', async (req, res) => {
 
         const downloadResponse = await blobClient.download();
         const body = await streamToBuffer(downloadResponse.readableStreamBody);
-        const statusData = JSON.parse(body.toString());
+        const content = body.toString('utf8');
         
-        res.json(statusData);
+        try {
+            const statusData = JSON.parse(content.trim());
+            res.json(statusData);
+        } catch (parseErr) {
+            console.error("JSON Parse Error for Status File:", parseErr.message);
+            console.error("Content received:", content.substring(0, 100)); // Log first 100 chars
+            res.json({ status: 'Processing', message: 'Jump Server is working... (updating status)' });
+        }
     } catch (err) {
         res.status(500).json({ 
             status: 'Error', 
