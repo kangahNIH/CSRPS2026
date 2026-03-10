@@ -322,17 +322,10 @@
             }
         }
 
-        // Generate SAS URL and trigger download
-        async function downloadReport(name) {
-            try {
-                const response = await fetch(`/api/download-report/${encodeURIComponent(name)}`);
-                const data = await response.json();
-                if (data.url) {
-                    window.open(data.url, '_blank');
-                }
-            } catch (err) {
-                alert('Failed to generate download link.');
-            }
+        // Proxy download via server
+        function downloadReport(name) {
+            // Simply navigate to the endpoint to trigger the browser's file download
+            window.location.href = `/api/download-report/${encodeURIComponent(name)}`;
         }
 
         // Load reports on page load
