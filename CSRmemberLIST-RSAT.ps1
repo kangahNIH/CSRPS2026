@@ -136,10 +136,12 @@ foreach ($groupName in $groupNames) {
         Write-Host " - Type: $groupType"
         Write-Host " - Total User Members: $userMemberCount"
 
+        # --- Step 5: Export and Upload this specific Group ---
         if ($userMemberCount -gt 0) {
             $members = $allGroupMembers | Get-ADUser -Properties SamaccountName, GivenName, SurName, EmailAddress, DisplayName, Office, Department, Company @adParams
 
-            $memberData = $members | Select-Object -Property `
+            $reportData = $members | Select-Object -Property `
+                @{Name = "No."; Expression = { $script:counter++; $script:counter }}, `
                 @{Name = "GroupName"; Expression = { $group.Name }}, `
                 SamAccountName, `
                 @{Name = "FirstName"; Expression = { $_.GivenName }}, `
@@ -150,7 +152,17 @@ foreach ($groupName in $groupNames) {
                 Department, `
                 Company
 
-            $allMembers += $memberData
+            $csvFilePath = Join-Path -Path $reportPath -ChildPath "$($filePrefix)-$currentDateTime.csv"
+            $reportData | Export-Csv -Path $csvFilePath -NoTypeInformation -Encoding UTF8 -Force
+            
+            Write-Host "Success! Group report generated: $csvFilePath" -ForegroundColor Green
+
+            # --- Step 6: Upload to Azure ---
+            if ($env:AZURE_STORAGE_CONNECTION_STRING) {
+                $blobName = Split-Path $csvFilePath -Leaf
+                az storage blob upload --container-name "reports" --file $csvFilePath --name $blobName --connection-string $env:AZURE_STORAGE_CONNECTION_STRING --overwrite --output none
+                Write-Host "Uploaded to Azure: $blobName" -ForegroundColor Gray
+            }
         }
         Write-Host "----------------------------------------"
     }
@@ -159,52 +171,5 @@ foreach ($groupName in $groupNames) {
     }
 }
 
-# Step 5: Sort, Number, and Export Data to CSV
-if ($allMembers.Count -gt 0) {
-    $csvFilePath = Join-Path -Path $reportPath -ChildPath "$filePrefix-$currentDateTime.csv"
-    try {
-        $sortedMembers = $allMembers | Sort-Object -Property GroupName, LastName
-        $reportData = @()
-        $groupCounter = 1
-        $currentGroupName = $sortedMembers[0].GroupName
-
-        foreach ($member in $sortedMembers) {
-            if ($member.GroupName -ne $currentGroupName) {
-                $groupCounter = 1
-                $currentGroupName = $member.GroupName
-            }
-            $reportData += [PSCustomObject]@{
-                "No."                 = $groupCounter
-                "GroupName"           = $member.GroupName
-                "SamAccountName"      = $member.SamAccountName
-                "FirstName"           = $member.FirstName
-                "LastName"            = $member.LastName
-                "PrimaryEmailAddress" = $member.PrimaryEmailAddress
-                "Display"             = $member.Display
-                "Office"              = $member.Office
-                "Department"          = $member.Department
-                "Company"             = $member.Company
-            }
-            $groupCounter++
-        }
-
-        $reportData | Export-Csv -Path $csvFilePath -NoTypeInformation -Encoding UTF8 -ErrorAction Stop
-        Write-Host "Success! Report generated at: $csvFilePath" -ForegroundColor Green
-
-        # --- STEP 6: UPLOAD TO AZURE ---
-        $storageContainer = "reports"
-        $connectionString = $env:AZURE_STORAGE_CONNECTION_STRING
-
-        if ($connectionString) {
-            $blobName = Split-Path $csvFilePath -Leaf
-            az storage blob upload --container-name $storageContainer --file $csvFilePath --name $blobName --connection-string $connectionString --overwrite
-            Update-RequestStatus -status "Completed" -message "Report generated and uploaded!"
-        }
-    }
-    catch {
-        Update-RequestStatus -status "Failed" -message "Error exporting CSV: $($_.Exception.Message)"
-    }
-}
-else {
-    Update-RequestStatus -status "Completed" -message "Process finished, no members found."
-}
+# Step 7: Final Status Update
+Update-RequestStatus -status "Completed" -message "All requested groups have been processed and uploaded individually."
