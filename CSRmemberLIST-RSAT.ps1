@@ -142,18 +142,20 @@ foreach ($groupName in $groupNames) {
 
             # Reset the counter for each new group/file
             $localCounter = 1
-
-            $reportData = $members | Select-Object -Property `
-                @{Name = "No."; Expression = { $localCounter++ }}, `
-                @{Name = "GroupName"; Expression = { $group.Name }}, `
-                SamAccountName, `
-                @{Name = "FirstName"; Expression = { $_.GivenName }}, `
-                @{Name = "LastName"; Expression = { $_.SurName }}, `
-                @{Name = "PrimaryEmailAddress"; Expression = { $_.EmailAddress }}, `
-                @{Name = "Display"; Expression = { $_.DisplayName }}, `
-                Office, `
-                Department, `
-                Company
+            $reportData = foreach ($member in $members) {
+                [PSCustomObject]@{
+                    "No."                 = $localCounter++
+                    "GroupName"           = $group.Name
+                    "SamAccountName"      = $member.SamAccountName
+                    "FirstName"           = $member.GivenName
+                    "LastName"            = $member.SurName
+                    "PrimaryEmailAddress" = $member.EmailAddress
+                    "Display"             = $member.DisplayName
+                    "Office"              = $member.Office
+                    "Department"          = $member.Department
+                    "Company"             = $member.Company
+                }
+            }
 
             $csvFilePath = Join-Path -Path $reportPath -ChildPath "$($thisGroupPrefix)-$currentDateTime.csv"
             $reportData | Export-Csv -Path $csvFilePath -NoTypeInformation -Encoding UTF8 -Force
