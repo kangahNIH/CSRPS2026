@@ -221,14 +221,22 @@
         async function fetchGroupLists() {
             try {
                 const response = await fetch('/api/group-lists');
-                if (!response.ok) throw new Error('Not found');
+                if (!response.ok) {
+                    if (response.status === 404) {
+                        throw new Error('404: Group list file not found in Azure Storage. Run Export-GroupLists.ps1 on the Jump Server.');
+                    } else {
+                        throw new Error(`HTTP Error: ${response.status}`);
+                    }
+                }
                 const data = await response.json();
                 allSGs = data.securityGroups || [];
                 allDLs = data.distributionLists || [];
                 renderLists();
             } catch (err) {
-                document.getElementById('sgList').innerHTML = '<li class="group-item">Error loading lists</li>';
-                document.getElementById('dlList').innerHTML = '<li class="group-item">Error loading lists</li>';
+                console.error('Fetch Group Lists Error:', err);
+                const errorMsg = `<li class="group-item" style="color: red; cursor: default;">${err.message}</li>`;
+                document.getElementById('sgList').innerHTML = errorMsg;
+                document.getElementById('dlList').innerHTML = errorMsg;
             }
         }
 

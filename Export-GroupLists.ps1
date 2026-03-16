@@ -11,9 +11,11 @@ if (-not $ConnectionString) {
     exit
 }
 
+Write-Host "Fetching Security Groups from: $SG_OU"
 # 1. Get Security Groups
 $SGs = Get-ADGroup -Filter * -SearchBase $SG_OU | Select-Object -ExpandProperty Name | Sort-Object
 
+Write-Host "Fetching Distribution Lists from: $DL_OU"
 # 2. Get Distribution Lists
 $DLs = Get-ADGroup -Filter * -SearchBase $DL_OU | Select-Object -ExpandProperty Name | Sort-Object
 
@@ -27,6 +29,12 @@ $GroupLists = @{
 # 4. Save and Upload
 $tempPath = "$env:TEMP\group-lists.json"
 $GroupLists | ConvertTo-Json | Set-Content -Path $tempPath -Encoding UTF8
+
+Write-Host "Uploading to Azure (Container: config)..."
+# Ensure container exists (silently continue if it does)
+az storage container create --name "config" --connection-string $ConnectionString --output none 2>$null
+
+# Upload the file
 az storage blob upload --container-name "config" --file $tempPath --name "group-lists.json" --connection-string $ConnectionString --overwrite --output none
 
 Write-Host "Successfully exported and uploaded group lists."
