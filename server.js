@@ -56,7 +56,14 @@ app.get('/api/group-lists', async (req, res) => {
 
         const downloadResponse = await blobClient.download();
         const body = await streamToBuffer(downloadResponse.readableStreamBody);
-        res.status(200).json(JSON.parse(body.toString('utf8')));
+        let content = body.toString('utf8');
+        
+        // Strip BOM if present
+        if (content.charCodeAt(0) === 0xFEFF) {
+            content = content.slice(1);
+        }
+        
+        res.status(200).json(JSON.parse(content.trim()));
     } catch (err) {
         res.status(500).json({ message: 'Failed to fetch group lists.', error: err.message });
     }
