@@ -11,6 +11,7 @@
             --bg: #f3f2f1;
             --card-bg: #ffffff;
             --text: #323130;
+            --border: #c8c6c4;
         }
 
         body {
@@ -20,57 +21,89 @@
             margin: 0;
             display: flex;
             justify-content: center;
-            align-items: center;
+            align-items: flex-start;
             min-height: 100vh;
+            padding: 2rem;
+            box-sizing: border-box;
         }
 
-        .container {
-            background-color: var(--card-bg);
-            padding: 2.5rem;
+        .main-layout {
+            display: flex;
+            gap: 1.5rem;
+            width: 100%;
+            max-width: 1200px;
+            align-items: stretch;
+        }
+
+        .side-panel {
+            flex: 1;
+            background: var(--card-bg);
+            padding: 1.5rem;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+            display: flex;
+            flex-direction: column;
+            height: 600px;
+        }
+
+        .center-panel {
+            flex: 1.5;
+            background: var(--card-bg);
+            padding: 2rem;
             border-radius: 8px;
             box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-            width: 100%;
-            max-width: 500px;
         }
 
-        h1 {
-            font-size: 1.5rem;
-            margin-bottom: 0.5rem;
+        h1, h2, h3 {
+            margin-top: 0;
             color: var(--primary);
         }
 
-        p {
-            font-size: 0.9rem;
-            color: #605e5c;
-            margin-bottom: 2rem;
+        h2 { font-size: 1.2rem; margin-bottom: 1rem; }
+        h3 { font-size: 1rem; color: var(--text); margin-bottom: 0.5rem; }
+
+        .search-box {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            margin-bottom: 1rem;
+            box-sizing: border-box;
         }
 
-        .form-group {
-            margin-bottom: 1.5rem;
+        .group-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+            overflow-y: auto;
+            flex-grow: 1;
+            border: 1px solid #f3f2f1;
         }
 
-        label {
-            display: block;
-            margin-bottom: 0.5rem;
-            font-weight: 600;
+        .group-item {
+            padding: 8px 12px;
+            border-bottom: 1px solid #f3f2f1;
+            cursor: pointer;
+            font-size: 0.85rem;
+            transition: background 0.2s;
+        }
+
+        .group-item:hover {
+            background-color: #f3f9ff;
+            color: var(--primary);
         }
 
         textarea {
             width: 100%;
             padding: 12px;
-            border: 1px solid #c8c6c4;
+            border: 1px solid var(--border);
             border-radius: 4px;
             font-family: inherit;
             font-size: 1rem;
             box-sizing: border-box;
             resize: vertical;
-            min-height: 100px;
-        }
-
-        textarea:focus {
-            outline: none;
-            border-color: var(--primary);
-            box-shadow: 0 0 0 2px rgba(0, 120, 212, 0.1);
+            min-height: 150px;
+            margin-bottom: 1rem;
         }
 
         button {
@@ -86,250 +119,177 @@
             transition: background-color 0.2s;
         }
 
-        button:hover {
-            background-color: var(--primary-hover);
-        }
+        button:hover { background-color: var(--primary-hover); }
 
-        #status {
-            margin-top: 1.5rem;
-            padding: 1rem;
-            border-radius: 4px;
-            display: none;
-        }
-
-        #status.success {
-            background-color: #dff6dd;
-            color: #107c10;
-            display: block;
-        }
-
-        #status.error {
-            background-color: #fde7e9;
-            color: #a4262c;
-            display: block;
-        }
-
-        /* Status Tracker Styles */
         .status-tracker {
             margin-top: 1.5rem;
-            padding: 1.5rem;
+            padding: 1rem;
             background-color: #f8f9fa;
             border-left: 4px solid var(--primary);
             border-radius: 4px;
             display: none;
         }
 
-        .status-tracker h3 {
-            margin-top: 0;
-            font-size: 1rem;
-            display: flex;
-            justify-content: space-between;
-        }
-
-        .status-badge {
-            font-size: 0.75rem;
-            padding: 2px 8px;
-            border-radius: 10px;
-            background: var(--primary);
-            color: white;
-            text-transform: uppercase;
-        }
-
-        .status-msg {
-            font-size: 0.9rem;
-            margin: 10px 0;
-            color: #323130;
-        }
-
-        .status-time {
-            font-size: 0.7rem;
-            color: #605e5c;
-        }
-
-        .status-failed {
-            border-left-color: #a4262c;
-        }
-        
-        .status-failed .status-badge {
-            background-color: #a4262c;
-        }
-
-        .hint {
-            font-size: 0.8rem;
-            color: #605e5c;
-            margin-top: 0.5rem;
-        }
-
-        /* Reports Section Styles */
         .reports-section {
             margin-top: 2rem;
             border-top: 1px solid #edebe9;
             padding-top: 1.5rem;
         }
 
-        .reports-section h2 {
-            font-size: 1.2rem;
-            margin-bottom: 1rem;
-            color: var(--text);
-        }
-
-        .report-list {
-            list-style: none;
-            padding: 0;
-            max-height: 250px;
-            overflow-y: auto;
-        }
-
         .report-item {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            padding: 10px;
+            padding: 8px;
             border-bottom: 1px solid #f3f2f1;
-            font-size: 0.9rem;
+            font-size: 0.85rem;
         }
 
-        .report-info {
-            display: flex;
-            flex-direction: column;
+        .download-link { color: var(--primary); cursor: pointer; font-weight: 600; text-decoration: none; }
+        .download-link:hover { text-decoration: underline; }
+
+        .refresh-btn { 
+            background: none; color: var(--primary); width: auto; padding: 0; font-size: 0.8rem; 
         }
 
-        .report-date {
-            font-size: 0.75rem;
-            color: #605e5c;
-        }
-
-        .download-link {
-            color: var(--primary);
-            text-decoration: none;
-            font-weight: 600;
-            cursor: pointer;
-        }
-
-        .download-link:hover {
-            text-decoration: underline;
-        }
-
-        .refresh-btn:hover {
-            text-decoration: underline;
-        }
-
-        .version-tag {
-            font-size: 0.7rem;
-            color: #a1a1a1;
-            text-align: right;
-            margin-bottom: 0.5rem;
-            display: block;
-        }
+        .version-tag { font-size: 0.7rem; color: #a1a1a1; text-align: right; margin-bottom: 0.5rem; display: block; }
+        
+        .hint { font-size: 0.8rem; color: #605e5c; margin-bottom: 1rem; }
     </style>
 </head>
 <body>
-    <div class="container">
-        <span class="version-tag">v.2026-03-09-version1</span>
-        <h1>Member Retrieval</h1>
-        <p>Enter the names of the Active Directory groups you want to query for member details.</p>
-        
-        <form id="groupForm">
-            <div class="form-group">
-                <label for="groupNames">Group Names</label>
-                <textarea id="groupNames" name="groupNames" placeholder="e.g. CSR-Members, Engineering-All, HR-Staff" required></textarea>
-                <div class="hint">Separate multiple groups with commas.</div>
-            </div>
-            <button type="submit" id="submitBtn">Start Retrieval</button>
-        </form>
-
-        <div id="status"></div>
-
-        <!-- Active Request Status Tracker -->
-        <div id="statusTracker" class="status-tracker">
-            <h3>Current Request <span id="trackerBadge" class="status-badge">Pending</span></h3>
-            <div id="trackerMsg" class="status-msg">Waiting for Jump Server to pick up request...</div>
-            <div id="trackerTime" class="status-time"></div>
+    <div class="main-layout">
+        <!-- Left Panel: Security Groups -->
+        <div class="side-panel">
+            <h2>Security Groups</h2>
+            <input type="text" id="sgSearch" class="search-box" placeholder="Search Security Groups...">
+            <ul id="sgList" class="group-list">
+                <li class="group-item">Loading groups...</li>
+            </ul>
         </div>
 
-        <!-- New Reports Section -->
-        <div class="reports-section">
-            <div style="display: flex; justify-content: space-between; align-items: baseline;">
-                <h2>Completed Reports</h2>
-                <button class="refresh-btn" onclick="fetchReports()">Refresh List</button>
+        <!-- Center Panel: Submission -->
+        <div class="center-panel">
+            <span class="version-tag">v.2026-03-16-version2</span>
+            <h1>Member Retrieval</h1>
+            <p>Select groups from the lists or type them manually below.</p>
+            
+            <form id="groupForm">
+                <div class="form-group">
+                    <label for="groupNames"><b>Selected Groups</b></label>
+                    <textarea id="groupNames" name="groupNames" placeholder="Click groups to add them here..." required></textarea>
+                    <div class="hint">Multiple groups are separated by commas.</div>
+                </div>
+                <button type="submit" id="submitBtn">Start Retrieval</button>
+            </form>
+
+            <div id="status" style="margin-top: 1rem; display: none; padding: 1rem; border-radius: 4px;"></div>
+
+            <div id="statusTracker" class="status-tracker">
+                <h3 style="display: flex; justify-content: space-between;">Request Status <span id="trackerBadge" style="font-size: 0.7rem; padding: 2px 8px; border-radius: 10px; background: var(--primary); color: white;">Pending</span></h3>
+                <div id="trackerMsg" style="font-size: 0.9rem; margin-bottom: 5px;"></div>
+                <div id="trackerTime" style="font-size: 0.7rem; color: #605e5c;"></div>
             </div>
-            <ul id="reportList" class="report-list">
-                <li class="report-item">Loading reports...</li>
+
+            <div class="reports-section">
+                <div style="display: flex; justify-content: space-between; align-items: baseline;">
+                    <h3>Recent Reports</h3>
+                    <button class="refresh-btn" onclick="fetchReports()">Refresh</button>
+                </div>
+                <div id="reportList" style="max-height: 200px; overflow-y: auto;">
+                    <div class="report-item">Loading reports...</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Right Panel: Distribution Lists -->
+        <div class="side-panel">
+            <h2>Distribution Lists</h2>
+            <input type="text" id="dlSearch" class="search-box" placeholder="Search Distribution Lists...">
+            <ul id="dlList" class="group-list">
+                <li class="group-item">Loading groups...</li>
             </ul>
         </div>
     </div>
 
     <script>
         let pollInterval = null;
+        let allSGs = [];
+        let allDLs = [];
 
+        // Fetch Group Lists from AD Exporter
+        async function fetchGroupLists() {
+            try {
+                const response = await fetch('/api/group-lists');
+                if (!response.ok) throw new Error('Not found');
+                const data = await response.json();
+                allSGs = data.securityGroups || [];
+                allDLs = data.distributionLists || [];
+                renderLists();
+            } catch (err) {
+                document.getElementById('sgList').innerHTML = '<li class="group-item">Error loading lists</li>';
+                document.getElementById('dlList').innerHTML = '<li class="group-item">Error loading lists</li>';
+            }
+        }
+
+        function renderLists() {
+            renderList('sgList', allSGs, document.getElementById('sgSearch').value);
+            renderList('dlList', allDLs, document.getElementById('dlSearch').value);
+        }
+
+        function renderList(elementId, items, filter) {
+            const list = document.getElementById(elementId);
+            const filtered = items.filter(item => item.toLowerCase().includes(filter.toLowerCase()));
+            list.innerHTML = filtered.map(item => `<li class="group-item" onclick="addGroup('${item}')">${item}</li>`).join('');
+            if (filtered.length === 0) list.innerHTML = '<li class="group-item">No matches</li>';
+        }
+
+        function addGroup(name) {
+            const textarea = document.getElementById('groupNames');
+            const current = textarea.value.split(',').map(s => s.trim()).filter(s => s !== "");
+            if (!current.includes(name)) {
+                current.push(name);
+                textarea.value = current.join(', ');
+            }
+        }
+
+        document.getElementById('sgSearch').addEventListener('input', renderLists);
+        document.getElementById('dlSearch').addEventListener('input', renderLists);
+
+        // Standard App Logic
         async function pollStatus(requestId) {
             const tracker = document.getElementById('statusTracker');
             const badge = document.getElementById('trackerBadge');
             const msg = document.getElementById('trackerMsg');
             const time = document.getElementById('trackerTime');
-
             tracker.style.display = 'block';
-            tracker.classList.remove('status-failed');
 
             try {
                 const response = await fetch(`/api/status/${requestId}`);
                 const data = await response.json();
-
                 badge.textContent = data.status;
                 msg.textContent = data.message;
                 if (data.timestamp) time.textContent = 'Last update: ' + data.timestamp;
-
-                if (data.status === 'Failed') {
-                    tracker.classList.add('status-failed');
+                if (data.status === 'Completed' || data.status === 'Failed') {
                     clearInterval(pollInterval);
-                } else if (data.status === 'Completed') {
-                    clearInterval(pollInterval);
-                    fetchReports(); // Refresh the file list
+                    fetchReports();
                 }
-            } catch (err) {
-                console.error('Polling error:', err);
-            }
+            } catch (err) { console.error(err); }
         }
 
-        // Fetch and display the list of reports
         async function fetchReports() {
-            const reportList = document.getElementById('reportList');
+            const reportDiv = document.getElementById('reportList');
             try {
                 const response = await fetch('/api/reports');
                 const reports = await response.json();
-
-                if (reports.length === 0) {
-                    reportList.innerHTML = '<li class="report-item">No reports found yet.</li>';
-                    return;
-                }
-
-                reportList.innerHTML = '';
-                reports.forEach(report => {
-                    const date = new Date(report.createdOn).toLocaleString();
-                    const li = document.createElement('li');
-                    li.className = 'report-item';
-                    li.innerHTML = `
-                        <div class="report-info">
-                            <span>${report.name}</span>
-                            <span class="report-date">${date}</span>
-                        </div>
-                        <a class="download-link" onclick="downloadReport('${report.name}')">Download</a>
-                    `;
-                    reportList.appendChild(li);
-                });
-            } catch (err) {
-                reportList.innerHTML = '<li class="report-item" style="color: red;">Failed to load reports.</li>';
-            }
+                reportDiv.innerHTML = reports.map(r => `
+                    <div class="report-item">
+                        <span>${r.name}</span>
+                        <a class="download-link" onclick="window.location.href='/api/download-report/${encodeURIComponent(r.name)}'">Download</a>
+                    </div>
+                `).join('') || '<div class="report-item">No reports found.</div>';
+            } catch (err) { reportDiv.innerHTML = 'Error loading reports.'; }
         }
-
-        // Proxy download via server
-        function downloadReport(name) {
-            // Simply navigate to the endpoint to trigger the browser's file download
-            window.location.href = `/api/download-report/${encodeURIComponent(name)}`;
-        }
-
-        // Load reports on page load
-        fetchReports();
 
         document.getElementById('groupForm').addEventListener('submit', async (e) => {
             e.preventDefault();
@@ -338,45 +298,30 @@
             const groupNames = document.getElementById('groupNames').value;
 
             submitBtn.disabled = true;
-            submitBtn.textContent = 'Submitting...';
-            statusDiv.className = '';
             statusDiv.style.display = 'none';
 
             try {
                 const response = await fetch('/api/submit-groups', {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
+                    headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ groupNames }),
                 });
-
                 const data = await response.json();
-
                 if (response.ok) {
-                    statusDiv.textContent = 'Request submitted successfully! Tracking progress below...';
-                    statusDiv.className = 'success';
-                    
-                    if (data.requestId) {
-                        if (pollInterval) clearInterval(pollInterval);
-                        pollStatus(data.requestId);
-                        pollInterval = setInterval(() => pollStatus(data.requestId), 5000);
-                    }
-                } else {
-                    // SHOW DETAILED ERROR
-                    const reason = data.error ? ` (${data.error})` : '';
-                    statusDiv.textContent = 'Error: ' + (data.message || 'Submission failed') + reason;
-                    statusDiv.className = 'error';
+                    statusDiv.innerHTML = 'Request submitted!';
+                    statusDiv.style.backgroundColor = '#dff6dd';
+                    statusDiv.style.display = 'block';
+                    if (pollInterval) clearInterval(pollInterval);
+                    pollStatus(data.requestId);
+                    pollInterval = setInterval(() => pollStatus(data.requestId), 5000);
                 }
-            } catch (err) {
-                statusDiv.textContent = 'Network error. Please try again later.';
-                statusDiv.className = 'error';
-            } finally {
-                submitBtn.disabled = false;
-                submitBtn.textContent = 'Start Retrieval';
-                statusDiv.style.display = 'block';
-            }
+            } catch (err) { alert('Submission failed'); }
+            finally { submitBtn.disabled = false; }
         });
+
+        // Init
+        fetchGroupLists();
+        fetchReports();
     </script>
 </body>
 </html>

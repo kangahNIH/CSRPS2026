@@ -43,6 +43,25 @@ app.get('/api/health', (req, res) => {
     });
 });
 
+// API Endpoint: Get list of AD groups
+app.get('/api/group-lists', async (req, res) => {
+    if (!blobServiceClient) return res.status(500).json({ message: 'Storage not configured.' });
+    try {
+        const containerClient = blobServiceClient.getContainerClient("config");
+        const blobClient = containerClient.getBlobClient("group-lists.json");
+        
+        if (!(await blobClient.exists())) {
+            return res.status(404).json({ message: 'Group lists not found. Ensure Export-GroupLists.ps1 has run on the Jump Server.' });
+        }
+
+        const downloadResponse = await blobClient.download();
+        const body = await streamToBuffer(downloadResponse.readableStreamBody);
+        res.status(200).json(JSON.parse(body.toString('utf8')));
+    } catch (err) {
+        res.status(500).json({ message: 'Failed to fetch group lists.', error: err.message });
+    }
+});
+
 // API Endpoint: Get list of reports
 app.get('/api/reports', async (req, res) => {
     if (!blobServiceClient) return res.status(500).json({ message: 'Storage not configured.' });
