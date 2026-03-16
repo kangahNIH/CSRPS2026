@@ -118,6 +118,7 @@ foreach ($groupName in $groupNames) {
 
         $group = Get-ADGroup -Identity $groupName -Properties Members, GroupCategory @adParams
 
+        # Determine if the group is a Security or Distribution group.
         $groupTypeCode = switch ($group.GroupCategory) {
             "Security"     { "SG" }
             "Distribution" { "DL" }
@@ -125,9 +126,8 @@ foreach ($groupName in $groupNames) {
         }
         $groupType = if ($groupTypeCode -eq "SG") { "Security Group" } else { "Distribution List" }
 
-        if ($filePrefix -eq "Report") {
-            $filePrefix = "$($groupTypeCode)-$($group.Name)"
-        }
+        # Generate a unique prefix for THIS specific group
+        $thisGroupPrefix = "$($groupTypeCode)-$($group.Name)"
 
         $allGroupMembers = Get-ADGroupMember -Identity $group -Recursive @adParams | Where-Object { $_.ObjectClass -eq 'user' }
         $userMemberCount = if ($null -ne $allGroupMembers) { ($allGroupMembers | Measure-Object).Count } else { 0 }
@@ -140,8 +140,11 @@ foreach ($groupName in $groupNames) {
         if ($userMemberCount -gt 0) {
             $members = $allGroupMembers | Get-ADUser -Properties SamaccountName, GivenName, SurName, EmailAddress, DisplayName, Office, Department, Company @adParams
 
+            # Reset the counter for each new group/file
+            $localCounter = 1
+
             $reportData = $members | Select-Object -Property `
-                @{Name = "No."; Expression = { $script:counter++; $script:counter }}, `
+                @{Name = "No."; Expression = { $localCounter++ }}, `
                 @{Name = "GroupName"; Expression = { $group.Name }}, `
                 SamAccountName, `
                 @{Name = "FirstName"; Expression = { $_.GivenName }}, `
@@ -152,7 +155,7 @@ foreach ($groupName in $groupNames) {
                 Department, `
                 Company
 
-            $csvFilePath = Join-Path -Path $reportPath -ChildPath "$($filePrefix)-$currentDateTime.csv"
+            $csvFilePath = Join-Path -Path $reportPath -ChildPath "$($thisGroupPrefix)-$currentDateTime.csv"
             $reportData | Export-Csv -Path $csvFilePath -NoTypeInformation -Encoding UTF8 -Force
             
             Write-Host "Success! Group report generated: $csvFilePath" -ForegroundColor Green
