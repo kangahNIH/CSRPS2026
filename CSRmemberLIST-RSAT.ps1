@@ -117,14 +117,14 @@ foreach ($groupName in $groupNames) {
         $adParams = @{ ErrorAction = 'Stop'; Server = "nih.gov" }
         if ($credential) { $adParams['Credential'] = $credential }
 
-        # Retrieve the group using a Filter (more robust than -Identity for names with spaces)
-        $group = Get-ADGroup -Filter "Name -eq '$groupName'" -Properties Members, GroupCategory @adParams | Select-Object -First 1
+        # Search by Name OR SamAccountName for maximum reliability (Version 2.2)
+        $group = Get-ADGroup -Filter "Name -eq '$groupName' -or SamAccountName -eq '$groupName'" -Properties GroupCategory @adParams | Select-Object -First 1
 
         if (-not $group) {
-            throw "Group '$groupName' was not found in Active Directory. Please verify the exact spelling (including spaces)."
+            throw "Group '$groupName' was not found in AD via Name or SamAccountName filter."
         }
 
-        # Determine if the group is a Security or Distribution group.
+        # Determine group type
         $groupTypeCode = switch ($group.GroupCategory) {
             "Security"     { "SG" }
             "Distribution" { "DL" }
@@ -135,7 +135,8 @@ foreach ($groupName in $groupNames) {
         # Generate a unique prefix for THIS specific group
         $thisGroupPrefix = "$($groupTypeCode)-$($group.Name)"
 
-        $allGroupMembers = Get-ADGroupMember -Identity $group -Recursive @adParams | Where-Object { $_.ObjectClass -eq 'user' }
+        # Use the absolute DistinguishedName for the member lookup to avoid 'Identity' errors
+        $allGroupMembers = Get-ADGroupMember -Identity $group.DistinguishedName -Recursive @adParams | Where-Object { $_.ObjectClass -eq 'user' }
         $userMemberCount = if ($null -ne $allGroupMembers) { ($allGroupMembers | Measure-Object).Count } else { 0 }
 
         Write-Host "Processing Group: '$($group.Name)'" -ForegroundColor Cyan
