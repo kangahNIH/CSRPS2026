@@ -138,9 +138,8 @@ foreach ($groupName in $groupNames) {
 
         # --- Step 5: Export and Upload this specific Group ---
         if ($userMemberCount -gt 0) {
+            # ... (existing export logic) ...
             $members = $allGroupMembers | Get-ADUser -Properties SamaccountName, GivenName, SurName, EmailAddress, DisplayName, Office, Department, Company @adParams
-
-            # Reset the counter for each new group/file
             $localCounter = 1
             $reportData = foreach ($member in $members) {
                 [PSCustomObject]@{
@@ -159,20 +158,22 @@ foreach ($groupName in $groupNames) {
 
             $csvFilePath = Join-Path -Path $reportPath -ChildPath "$($thisGroupPrefix)-$currentDateTime.csv"
             $reportData | Export-Csv -Path $csvFilePath -NoTypeInformation -Encoding UTF8 -Force
-            
             Write-Host "Success! Group report generated: $csvFilePath" -ForegroundColor Green
 
-            # --- Step 6: Upload to Azure ---
             if ($env:AZURE_STORAGE_CONNECTION_STRING) {
                 $blobName = Split-Path $csvFilePath -Leaf
                 az storage blob upload --container-name "reports" --file $csvFilePath --name $blobName --connection-string $env:AZURE_STORAGE_CONNECTION_STRING --overwrite --output none
-                Write-Host "Uploaded to Azure: $blobName" -ForegroundColor Gray
             }
+        }
+        else {
+            Write-Host "No user members found for group '$groupName'." -ForegroundColor Yellow
+            Update-RequestStatus -status "Processing" -message "Group [$groupName] has 0 members. Skipping file generation."
         }
         Write-Host "----------------------------------------"
     }
     catch {
         Write-Warning "Could not process group '$groupName'. Error: $($_.Exception.Message)"
+        Update-RequestStatus -status "Processing" -message "Warning: Could not find or access group [$groupName]. Error: $($_.Exception.Message)"
     }
 }
 
