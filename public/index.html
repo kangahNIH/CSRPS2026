@@ -128,6 +128,20 @@
             border-left: 4px solid var(--primary);
             border-radius: 4px;
             display: none;
+            height: 150px;
+            overflow-y: auto;
+        }
+
+        .status-msg-item {
+            font-size: 0.85rem;
+            margin-bottom: 8px;
+            padding-bottom: 8px;
+            border-bottom: 1px solid #eee;
+        }
+
+        .status-msg-item:last-child {
+            border-bottom: none;
+            margin-bottom: 0;
         }
 
         .reports-section {
@@ -216,9 +230,11 @@
         let pollInterval = null;
         let allSGs = [];
         let allDLs = [];
+        let seenMessages = [];
 
         // Fetch Group Lists from AD Exporter
         async function fetchGroupLists() {
+            // ... (keep as is)
             try {
                 const response = await fetch('/api/group-lists');
                 if (!response.ok) {
@@ -268,16 +284,29 @@
         async function pollStatus(requestId) {
             const tracker = document.getElementById('statusTracker');
             const badge = document.getElementById('trackerBadge');
-            const msg = document.getElementById('trackerMsg');
+            const msgContainer = document.getElementById('trackerMsg');
             const time = document.getElementById('trackerTime');
             tracker.style.display = 'block';
 
             try {
                 const response = await fetch(`/api/status/${requestId}`);
                 const data = await response.json();
+                
                 badge.textContent = data.status;
-                msg.textContent = data.message;
                 if (data.timestamp) time.textContent = 'Last update: ' + data.timestamp;
+
+                // Only append if the message is new
+                if (data.message && !seenMessages.includes(data.message)) {
+                    seenMessages.push(data.message);
+                    const msgDiv = document.createElement('div');
+                    msgDiv.className = 'status-msg-item';
+                    msgDiv.innerHTML = `<strong>[${new Date().toLocaleTimeString()}]</strong> ${data.message}`;
+                    msgContainer.appendChild(msgDiv);
+                    
+                    // Auto-scroll to bottom
+                    tracker.scrollTop = tracker.scrollHeight;
+                }
+
                 if (data.status === 'Completed' || data.status === 'Failed') {
                     clearInterval(pollInterval);
                     fetchReports();
@@ -304,9 +333,12 @@
             const submitBtn = document.getElementById('submitBtn');
             const statusDiv = document.getElementById('status');
             const groupNames = document.getElementById('groupNames').value;
+            const msgContainer = document.getElementById('trackerMsg');
 
             submitBtn.disabled = true;
             statusDiv.style.display = 'none';
+            msgContainer.innerHTML = ''; // Clear old messages
+            seenMessages = []; // Reset history
 
             try {
                 const response = await fetch('/api/submit-groups', {
