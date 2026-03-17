@@ -111,6 +111,10 @@ $groupNames = $groupNamesInput.Split(',') | ForEach-Object { $_.Trim() }
 $totalGroups = $groupNames.Count
 $currentGroupIdx = 0
 
+# Initial Status: Log exactly what was received (Version 2.4)
+$receivedList = $groupNames -join ", "
+Update-RequestStatus -status "Processing" -message "Jump Server received $totalGroups items to process: [$receivedList]"
+
 # Initialize an array to hold all member data.
 $allMembers = @()
 Write-Host ""
@@ -118,7 +122,12 @@ Write-Host ""
 # Step 4: Process Each Group
 foreach ($groupName in $groupNames) {
     $currentGroupIdx++
-    if ([string]::IsNullOrWhiteSpace($groupName)) { continue }
+    
+    # Report the attempt even if the name is empty so we can debug gaps
+    if ([string]::IsNullOrWhiteSpace($groupName)) { 
+        Update-RequestStatus -status "Processing" -message "Skipping item $currentGroupIdx because the group name is empty or whitespace."
+        continue 
+    }
 
     Update-RequestStatus -status "Processing" -message "Processing group $currentGroupIdx of $($totalGroups): [$groupName]..."
 
