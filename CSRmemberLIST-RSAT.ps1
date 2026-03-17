@@ -21,6 +21,9 @@ function Update-RequestStatus {
         $tempPath = "$env:TEMP\$requestId.json"
         $statusObj | ConvertTo-Json | Set-Content -Path $tempPath -Encoding UTF8
         az storage blob upload --container-name "status" --file $tempPath --name "$requestId.json" --connection-string $env:AZURE_STORAGE_CONNECTION_STRING --overwrite --output none
+        
+        # Small delay to allow Azure/Frontend to catch the update
+        Start-Sleep -Milliseconds 500
     }
 }
 
