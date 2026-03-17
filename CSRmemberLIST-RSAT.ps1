@@ -9,21 +9,28 @@ param (
     [string]$requestId
 )
 
+# Global variable to track status history
+$script:statusHistory = @()
+
 # Helper function to update status in Azure
 function Update-RequestStatus {
     param([string]$status, [string]$message)
     if ($requestId -and $env:AZURE_STORAGE_CONNECTION_STRING) {
-        $statusObj = @{
-            status = $status
-            message = $message
+        # Add to history
+        $script:statusHistory += @{
+            message   = $message
             timestamp = (Get-Date).ToString("yyyy-MM-dd HH:mm:ss")
         }
-        $tempPath = "$env:TEMP\$requestId.json"
-        $statusObj | ConvertTo-Json | Set-Content -Path $tempPath -Encoding UTF8
-        az storage blob upload --container-name "status" --file $tempPath --name "$requestId.json" --connection-string $env:AZURE_STORAGE_CONNECTION_STRING --overwrite --output none
+
+        $statusObj = @{
+            status    = $status
+            history   = $script:statusHistory
+            lastUpdated = (Get-Date).ToString("yyyy-MM-dd HH:mm:ss")
+        }
         
-        # Small delay to allow Azure/Frontend to catch the update
-        Start-Sleep -Milliseconds 500
+        $tempPath = "$env:TEMP\$requestId.json"
+        $statusObj | ConvertTo-Json -Depth 5 | Set-Content -Path $tempPath -Encoding UTF8
+        az storage blob upload --container-name "status" --file $tempPath --name "$requestId.json" --connection-string $env:AZURE_STORAGE_CONNECTION_STRING --overwrite --output none
     }
 }
 

@@ -293,19 +293,21 @@
                 const data = await response.json();
                 
                 badge.textContent = data.status;
-                if (data.timestamp) time.textContent = 'Last update: ' + data.timestamp;
+                if (data.lastUpdated) time.textContent = 'Last update: ' + data.lastUpdated;
 
-                // Only append if the message is new
-                if (data.message && !seenMessages.includes(data.message)) {
-                    seenMessages.push(data.message);
-                    const msgDiv = document.createElement('div');
-                    msgDiv.className = 'status-msg-item';
-                    msgDiv.innerHTML = `<strong>[${new Date().toLocaleTimeString()}]</strong> ${data.message}`;
-                    msgContainer.appendChild(msgDiv);
-                    
-                    // Auto-scroll to bottom
-                    tracker.scrollTop = tracker.scrollHeight;
-                }
+                // Handle History (Version 2.3)
+                const messagesToShow = data.history || [];
+                messagesToShow.forEach(item => {
+                    const uniqueKey = `${item.timestamp}-${item.message}`;
+                    if (!seenMessages.includes(uniqueKey)) {
+                        seenMessages.push(uniqueKey);
+                        const msgDiv = document.createElement('div');
+                        msgDiv.className = 'status-msg-item';
+                        msgDiv.innerHTML = `<strong>[${new Date(item.timestamp.replace(/-/g, '/')).toLocaleTimeString()}]</strong> ${item.message}`;
+                        msgContainer.appendChild(msgDiv);
+                        tracker.scrollTop = tracker.scrollHeight;
+                    }
+                });
 
                 if (data.status === 'Completed' || data.status === 'Failed') {
                     clearInterval(pollInterval);
