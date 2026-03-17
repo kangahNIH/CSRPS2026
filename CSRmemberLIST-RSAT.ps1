@@ -142,29 +142,31 @@ foreach ($groupName in $groupNames) {
         Write-Host "Processing Group: '$($group.Name)'" -ForegroundColor Cyan
         Write-Host " - Type: $groupType"
         Write-Host " - Total User Members: $userMemberCount"
+# --- Step 5: Export and Upload this specific Group ---
+if ($userMemberCount -gt 0) {
+    # Pull extra properties to ensure we get a valid email
+    $members = $allGroupMembers | Get-ADUser -Properties SamaccountName, GivenName, SurName, EmailAddress, mail, DisplayName, Office, Department, Company @adParams
 
-        # --- Step 5: Export and Upload this specific Group ---
-        if ($userMemberCount -gt 0) {
-            # ... (existing export logic) ...
-            $members = $allGroupMembers | Get-ADUser -Properties SamaccountName, GivenName, SurName, EmailAddress, DisplayName, Office, Department, Company @adParams
-            $localCounter = 1
-            $reportData = foreach ($member in $members) {
-                [PSCustomObject]@{
-                    "No."                 = $localCounter++
-                    "GroupName"           = $group.Name
-                    "SamAccountName"      = $member.SamAccountName
-                    "FirstName"           = $member.GivenName
-                    "LastName"            = $member.SurName
-                    "PrimaryEmailAddress" = $member.EmailAddress
-                    "Display"             = $member.DisplayName
-                    "Office"              = $member.Office
-                    "Department"          = $member.Department
-                    "Company"             = $member.Company
-                }
-            }
+    # Reset the counter for each new group/file
+    $localCounter = 1
+    # Sort by SurName (Last Name) before creating objects
+    $reportData = $members | Sort-Object SurName | ForEach-Object {
+        [PSCustomObject]@{
+            "No."                 = $localCounter++
+            "GroupName"           = $group.Name
+            "SamAccountName"      = $_.SamAccountName
+            "FirstName"           = $_.GivenName
+            "LastName"            = $_.SurName
+            "PrimaryEmailAddress" = if ($_.EmailAddress) { $_.EmailAddress } else { $_.mail }
+            "Display"             = $_.DisplayName
+            "Office"              = $_.Office
+            "Department"          = $_.Department
+            "Company"             = $_.Company
+        }
+    }
 
-            $csvFilePath = Join-Path -Path $reportPath -ChildPath "$($thisGroupPrefix)-$currentDateTime.csv"
-            $reportData | Export-Csv -Path $csvFilePath -NoTypeInformation -Encoding UTF8 -Force
+    $csvFilePath = Join-Path -Path $reportPath -ChildPath "$($thisGroupPrefix)-$currentDateTime.csv"
+    $reportData | Export-Csv -Path $csvFilePath -NoTypeInformation -Encoding UTF8 -Force
             Write-Host "Success! Group report generated: $csvFilePath" -ForegroundColor Green
 
             if ($env:AZURE_STORAGE_CONNECTION_STRING) {
