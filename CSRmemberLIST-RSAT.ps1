@@ -113,10 +113,16 @@ foreach ($groupName in $groupNames) {
     Update-RequestStatus -status "Processing" -message "Processing group $currentGroupIdx of $($totalGroups): [$groupName]..."
 
     try {
-        $adParams = @{ ErrorAction = 'Stop' }
+        # Define parameters for AD cmdlets, ensuring we target the correct server
+        $adParams = @{ ErrorAction = 'Stop'; Server = "nih.gov" }
         if ($credential) { $adParams['Credential'] = $credential }
 
-        $group = Get-ADGroup -Identity $groupName -Properties Members, GroupCategory @adParams
+        # Retrieve the group using a Filter (more robust than -Identity for names with spaces)
+        $group = Get-ADGroup -Filter "Name -eq '$groupName'" -Properties Members, GroupCategory @adParams | Select-Object -First 1
+
+        if (-not $group) {
+            throw "Group '$groupName' was not found in Active Directory. Please verify the exact spelling (including spaces)."
+        }
 
         # Determine if the group is a Security or Distribution group.
         $groupTypeCode = switch ($group.GroupCategory) {
