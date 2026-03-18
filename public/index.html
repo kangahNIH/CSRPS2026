@@ -338,7 +338,13 @@
             const msgContainer = document.getElementById('trackerMsg');
 
             submitBtn.disabled = true;
-            statusDiv.style.display = 'none';
+            
+            // Immediate Warning Message
+            statusDiv.innerHTML = '<strong style="color: #d83b01;">Note:</strong> Process involves Azure, Jump Server, and AD. It may take 1-2 mins to see the first status update. Please wait...';
+            statusDiv.style.backgroundColor = '#fff4ce'; // Warning yellow
+            statusDiv.style.color = '#323130';
+            statusDiv.style.display = 'block';
+            
             msgContainer.innerHTML = ''; // Clear old messages
             seenMessages = []; // Reset history
 
@@ -350,14 +356,20 @@
                 });
                 const data = await response.json();
                 if (response.ok) {
-                    statusDiv.innerHTML = 'Request submitted!';
-                    statusDiv.style.backgroundColor = '#dff6dd';
-                    statusDiv.style.display = 'block';
+                    // Update to success but keep the expectation
+                    statusDiv.innerHTML = 'Request queued! Watch tracker below (may take 1-2 mins to start).';
+                    statusDiv.style.backgroundColor = '#dff6dd'; // Success green
+                    statusDiv.style.color = '#107c10';
+                    
                     if (pollInterval) clearInterval(pollInterval);
                     pollStatus(data.requestId);
                     pollInterval = setInterval(() => pollStatus(data.requestId), 5000);
                 }
-            } catch (err) { alert('Submission failed'); }
+            } catch (err) { 
+                statusDiv.innerHTML = 'Submission failed due to network error.';
+                statusDiv.style.backgroundColor = '#fde7e9';
+                statusDiv.style.color = '#a4262c';
+            }
             finally { submitBtn.disabled = false; }
         });
 
