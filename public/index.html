@@ -12,6 +12,8 @@
             --card-bg: #ffffff;
             --text: #323130;
             --border: #c8c6c4;
+            --success: #107c10;
+            --error: #a4262c;
         }
 
         body {
@@ -169,6 +171,25 @@
         .version-tag { font-size: 0.7rem; color: #a1a1a1; text-align: right; margin-bottom: 0.5rem; display: block; }
         
         .hint { font-size: 0.8rem; color: #605e5c; margin-bottom: 1rem; }
+
+        /* Poller Status Styles */
+        .poller-status-container {
+            font-size: 0.75rem;
+            color: #605e5c;
+            margin-bottom: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            display: inline-block;
+        }
+        .status-online { background-color: var(--success); }
+        .status-offline { background-color: var(--error); }
+        .status-unknown { background-color: #c8c6c4; }
     </style>
 </head>
 <body>
@@ -184,7 +205,13 @@
 
         <!-- Center Panel: Submission -->
         <div class="center-panel">
-            <span class="version-tag">v.2026-03-16-version3</span>
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <div id="pollerStatus" class="poller-status-container">
+                    <span id="statusDot" class="status-dot status-unknown"></span>
+                    <span id="statusText">System Status: Checking...</span>
+                </div>
+                <span class="version-tag">v.2026-03-24-heartbeat</span>
+            </div>
             <h1>Member Retrieval</h1>
             <p>Select groups from the lists or type them manually below.</p>
             
@@ -231,6 +258,28 @@
         let allSGs = [];
         let allDLs = [];
         let seenMessages = [];
+
+        // Fetch Poller Status (Heartbeat)
+        async function checkPollerStatus() {
+            const dot = document.getElementById('statusDot');
+            const text = document.getElementById('statusText');
+            try {
+                const response = await fetch('/api/poller-status');
+                const data = await response.json();
+                
+                if (data.status === 'Online') {
+                    dot.className = 'status-dot status-online';
+                    text.innerText = `Jump Server: Online (${data.lastSeen})`;
+                    text.title = `Running on: ${data.machine}`;
+                } else {
+                    dot.className = 'status-dot status-offline';
+                    text.innerText = `Jump Server: Offline (${data.message || 'Check Server'})`;
+                }
+            } catch (err) {
+                dot.className = 'status-dot status-unknown';
+                text.innerText = 'Jump Server: Connection Error';
+            }
+        }
 
         // Fetch Group Lists from AD Exporter
         async function fetchGroupLists() {
@@ -374,6 +423,8 @@
         });
 
         // Init
+        checkPollerStatus();
+        setInterval(checkPollerStatus, 60000); // Check every minute
         fetchGroupLists();
         fetchReports();
     </script>

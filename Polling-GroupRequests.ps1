@@ -10,6 +10,17 @@ Write-Host "Starting Polling for AD Group Member Retrieval requests..." -Foregro
 
 while ($true) {
     try {
+        # --- HEARTBEAT UPDATE ---
+        $heartbeat = @{
+            lastSeen = (Get-Date).ToString("yyyy-MM-dd HH:mm:ss")
+            status   = "Running"
+            machine  = $env:COMPUTERNAME
+        }
+        $heartbeatPath = "$env:TEMP\poller-heartbeat.json"
+        $heartbeat | ConvertTo-Json | Set-Content -Path $heartbeatPath -Encoding UTF8
+        az storage blob upload --container-name "config" --file $heartbeatPath --name "poller-heartbeat.json" --connection-string $ConnectionString --overwrite --output none
+        # -------------------------
+
         $messages = az storage message get --queue-name $QueueName --connection-string $ConnectionString --num-messages 1 --output json | ConvertFrom-Json
         
         if ($messages.Count -gt 0) {

@@ -1,3 +1,4 @@
+require('dotenv').config();
 console.log("--- NODE SERVER STARTING ---");
 const express = require('express');
 const bodyParser = require('body-parser');
@@ -82,6 +83,36 @@ app.get('/api/reports', async (req, res) => {
         res.status(200).json(reports);
     } catch (err) {
         res.status(500).json({ message: 'Failed to list reports.', error: err.message });
+    }
+});
+
+// API Endpoint: Poller status (Heartbeat check)
+app.get('/api/poller-status', async (req, res) => {
+    if (!blobServiceClient) return res.status(500).json({ status: 'Unknown' });
+    try {
+        const containerClient = blobServiceClient.getContainerClient("config");
+        const blobClient = containerClient.getBlobClient("poller-heartbeat.json");
+
+        if (!(await blobClient.exists())) {
+            return res.json({ status: 'Offline', message: 'No heartbeat file found in storage.' });
+        }
+
+        const downloadResponse = await blobClient.download();
+        const body = await streamToBuffer(downloadResponse.readableStreamBody);
+        const data = JSON.parse(body.toString('utf8'));
+
+        // Check if lastSeen is within the last 5 minutes (allowing for jitter)
+        const lastSeen = new Date(data.lastSeen);
+        const now = new Date();
+        const diffMinutes = (now - lastSeen) / 1000 / 60;
+
+        if (diffMinutes < 5) {
+            res.json({ status: 'Online', lastSeen: data.lastSeen, machine: data.machine });
+        } else {
+            res.json({ status: 'Offline', lastSeen: data.lastSeen, message: 'Poller has stopped responding.' });
+        }
+    } catch (err) {
+        res.status(500).json({ status: 'Error', error: err.message });
     }
 });
 
