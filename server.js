@@ -101,15 +101,19 @@ app.get('/api/poller-status', async (req, res) => {
         const body = await streamToBuffer(downloadResponse.readableStreamBody);
         const data = JSON.parse(body.toString('utf8'));
 
-        // Check if lastSeen is within the last 5 minutes (allowing for jitter)
-        const lastSeen = new Date(data.lastSeen);
+        // Parse date carefully
+        const lastSeen = new Date(data.lastSeen.replace(/-/g, '/')); // Handle potential legacy formats
         const now = new Date();
-        const diffMinutes = (now - lastSeen) / 1000 / 60;
+        
+        // Calculate difference in minutes (absolute value to handle clock skew)
+        const diffMinutes = Math.abs(now - lastSeen) / 1000 / 60;
 
-        if (diffMinutes < 5) {
+        // If difference is less than 5 minutes, it's online
+        // Note: We use Math.abs because if the Jump Server clock is AHEAD of Azure, diff would be negative.
+        if (diffMinutes < 10) { 
             res.json({ status: 'Online', lastSeen: data.lastSeen, machine: data.machine });
         } else {
-            res.json({ status: 'Offline', lastSeen: data.lastSeen, message: 'Poller has stopped responding.' });
+            res.json({ status: 'Offline', lastSeen: data.lastSeen, message: `Poller is ${Math.round(diffMinutes)} mins out of sync.` });
         }
     } catch (err) {
         res.status(500).json({ status: 'Error', error: err.message });
