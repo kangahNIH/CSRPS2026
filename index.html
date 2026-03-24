@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AD Group Member Retrieval</title>
+    <style>
+        :root {
+            --primary: #0078d4;
+            --primary-hover: #106ebe;
+            --bg: #f3f2f1;
+            --card-bg: #ffffff;
+            --text: #323130;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg);
+            color: var(--text);
+            margin: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+        }
+
+        .container {
+            background-color: var(--card-bg);
+            padding: 2.5rem;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+            width: 100%;
+            max-width: 500px;
+        }
+
+        h1 {
+            font-size: 1.5rem;
+            margin-bottom: 0.5rem;
+            color: var(--primary);
+        }
+
+        p {
+            font-size: 0.9rem;
+            color: #605e5c;
+            margin-bottom: 2rem;
+        }
+
+        .form-group {
+            margin-bottom: 1.5rem;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: 600;
+        }
+
+        textarea {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #c8c6c4;
+            border-radius: 4px;
+            font-family: inherit;
+            font-size: 1rem;
+            box-sizing: border-box;
+            resize: vertical;
+            min-height: 100px;
+        }
+
+        textarea:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 2px rgba(0, 120, 212, 0.1);
+        }
+
+        button {
+            background-color: var(--primary);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 4px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            width: 100%;
+            transition: background-color 0.2s;
+        }
+
+        button:hover {
+            background-color: var(--primary-hover);
+        }
+
+        #status {
+            margin-top: 1.5rem;
+            padding: 1rem;
+            border-radius: 4px;
+            display: none;
+        }
+
+        #status.success {
+            background-color: #dff6dd;
+            color: #107c10;
+            display: block;
+        }
+
+        #status.error {
+            background-color: #fde7e9;
+            color: #a4262c;
+            display: block;
+        }
+
+        .hint {
+            font-size: 0.8rem;
+            color: #605e5c;
+            margin-top: 0.5rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Member Retrieval</h1>
+        <p>Enter the names of the Active Directory groups you want to query for member details.</p>
+        
+        <form id="groupForm">
+            <div class="form-group">
+                <label for="groupNames">Group Names</label>
+                <textarea id="groupNames" name="groupNames" placeholder="e.g. CSR-Members, Engineering-All, HR-Staff" required></textarea>
+                <div class="hint">Separate multiple groups with commas.</div>
+            </div>
+            <button type="submit" id="submitBtn">Start Retrieval</button>
+        </form>
+
+        <div id="status"></div>
+    </div>
+
+    <script>
+        document.getElementById('groupForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const submitBtn = document.getElementById('submitBtn');
+            const statusDiv = document.getElementById('status');
+            const groupNames = document.getElementById('groupNames').value;
+
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Submitting...';
+            statusDiv.className = '';
+            statusDiv.style.display = 'none';
+
+            try {
+                const response = await fetch('/api/submit-groups', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ groupNames }),
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    statusDiv.textContent = 'Request submitted successfully! The Jump Server will process the groups soon.';
+                    statusDiv.className = 'success';
+                } else {
+                    statusDiv.textContent = 'Error: ' + (data.message || 'Something went wrong.');
+                    statusDiv.className = 'error';
+                }
+            } catch (err) {
+                statusDiv.textContent = 'Network error. Please try again later.';
+                statusDiv.className = 'error';
+            } finally {
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Start Retrieval';
+                statusDiv.style.display = 'block';
+            }
+        });
+    </script>
+</body>
+</html>
