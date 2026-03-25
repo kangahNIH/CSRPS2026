@@ -30,7 +30,7 @@ function Update-RequestStatus {
         
         $tempPath = "$env:TEMP\$requestId.json"
         $statusObj | ConvertTo-Json -Depth 5 | Set-Content -Path $tempPath -Encoding UTF8
-        az storage blob upload --container-name "status" --file $tempPath --name "$requestId.json" --connection-string $env:AZURE_STORAGE_CONNECTION_STRING --overwrite --output none
+        az storage blob upload --container-name "status" --file $tempPath --name "$requestId.json" --connection-string $env:AZURE_STORAGE_CONNECTION_STRING --overwrite --output none --auth-mode key
     }
 }
 
@@ -190,7 +190,7 @@ if ($userMemberCount -gt 0) {
 
             if ($env:AZURE_STORAGE_CONNECTION_STRING) {
                 $blobName = Split-Path $csvFilePath -Leaf
-                az storage blob upload --container-name "reports" --file $csvFilePath --name $blobName --connection-string $env:AZURE_STORAGE_CONNECTION_STRING --overwrite --output none
+                az storage blob upload --container-name "reports" --file $csvFilePath --name $blobName --connection-string $env:AZURE_STORAGE_CONNECTION_STRING --overwrite --output none --auth-mode key
             }
         }
         else {

@@ -94,7 +94,7 @@ app.get('/api/poller-status', async (req, res) => {
         const blobClient = containerClient.getBlobClient("poller-heartbeat.json");
 
         if (!(await blobClient.exists())) {
-            return res.json({ status: 'Offline', message: 'No heartbeat file found in storage.' });
+            return res.json({ status: 'Offline', lastSeen: 'Never', message: 'No heartbeat file. Ensure Polling-GroupRequests.ps1 is running on the Jump Server.' });
         }
 
         const downloadResponse = await blobClient.download();
@@ -102,18 +102,17 @@ app.get('/api/poller-status', async (req, res) => {
         const data = JSON.parse(body.toString('utf8'));
 
         // Parse date carefully
-        const lastSeen = new Date(data.lastSeen.replace(/-/g, '/')); // Handle potential legacy formats
+        const lastSeenStr = data.lastSeen.replace(/-/g, '/');
+        const lastSeen = new Date(lastSeenStr);
         const now = new Date();
         
         // Calculate difference in minutes (absolute value to handle clock skew)
         const diffMinutes = Math.abs(now - lastSeen) / 1000 / 60;
 
-        // If difference is less than 5 minutes, it's online
-        // Note: We use Math.abs because if the Jump Server clock is AHEAD of Azure, diff would be negative.
         if (diffMinutes < 10) { 
             res.json({ status: 'Online', lastSeen: data.lastSeen, machine: data.machine });
         } else {
-            res.json({ status: 'Offline', lastSeen: data.lastSeen, message: `Poller is ${Math.round(diffMinutes)} mins out of sync.` });
+            res.json({ status: 'Offline', lastSeen: data.lastSeen, message: `Jump Server (CSRMGMT02) last checked in ${Math.round(diffMinutes)} mins ago.` });
         }
     } catch (err) {
         res.status(500).json({ status: 'Error', error: err.message });
