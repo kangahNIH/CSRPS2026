@@ -217,7 +217,10 @@
             
             <form id="groupForm">
                 <div class="form-group">
-                    <label for="groupNames"><b>Selected Groups</b></label>
+                    <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 5px;">
+                        <label for="groupNames"><b>Selected Groups</b></label>
+                        <button type="button" onclick="clearSelection()" style="width: auto; padding: 4px 8px; font-size: 0.75rem; background-color: #f3f2f1; color: var(--text); border: 1px solid var(--border);">Clear Selection</button>
+                    </div>
                     <textarea id="groupNames" name="groupNames" placeholder="Click groups to add them here..." required></textarea>
                     <div class="hint">Multiple groups are separated by commas.</div>
                 </div>
@@ -326,6 +329,10 @@
             }
         }
 
+        function clearSelection() {
+            document.getElementById('groupNames').value = '';
+        }
+
         document.getElementById('sgSearch').addEventListener('input', renderLists);
         document.getElementById('dlSearch').addEventListener('input', renderLists);
 
@@ -427,6 +434,7 @@
         setInterval(checkPollerStatus, 60000); // Check every minute
         fetchGroupLists();
         fetchReports();
+        setInterval(fetchReports, 30000); // Refresh reports every 30 seconds
     </script>
 </body>
 </html>
