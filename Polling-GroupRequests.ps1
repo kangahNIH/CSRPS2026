@@ -18,12 +18,12 @@ while ($true) {
         }
         $heartbeatPath = "$env:TEMP\poller-heartbeat.json"
         $heartbeat | ConvertTo-Json | Set-Content -Path $heartbeatPath -Encoding UTF8
-        # Use --auth-mode key to ensure it uses the connection string instead of user login
-        az storage blob upload --container-name "config" --file $heartbeatPath --name "poller-heartbeat.json" --connection-string $ConnectionString --overwrite --output none --auth-mode key
+        # Added --only-show-errors and suppressed progress to reduce noise
+        az storage blob upload --container-name "config" --file $heartbeatPath --name "poller-heartbeat.json" --connection-string $ConnectionString --overwrite --output none --auth-mode key --only-show-errors --no-progress
         # -------------------------
 
         # Get message and ensure we handle the encoding
-        $messages = az storage message get --queue-name $QueueName --connection-string $ConnectionString --num-messages 1 --output json --auth-mode key | ConvertFrom-Json
+        $messages = az storage message get --queue-name $QueueName --connection-string $ConnectionString --num-messages 1 --output json --auth-mode key --only-show-errors | ConvertFrom-Json
         
         if ($messages.Count -gt 0) {
             foreach ($msg in $messages) {
