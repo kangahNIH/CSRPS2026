@@ -12,7 +12,7 @@ while ($true) {
     try {
         # --- HEARTBEAT UPDATE ---
         $heartbeat = @{
-            lastSeen = (Get-Date).ToString("yyyy-MM-dd HH:mm:ss")
+            lastSeen = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")
             status   = "Running"
             machine  = $env:COMPUTERNAME
         }
@@ -41,7 +41,7 @@ while ($true) {
                     # Execute with RequestID for status tracking
                     & $LocalScriptPath -groupNamesInput $groupNames -requestId $requestId
                     
-                    az storage message delete --id $msg.id --pop-receipt $msg.popReceipt --queue-name $QueueName --connection-string $ConnectionString
+                    az storage message delete --id $msg.id --pop-receipt $msg.popReceipt --queue-name $QueueName --connection-string $ConnectionString --auth-mode key --only-show-errors
                 } else {
                     Write-Error "Local script not found at: $LocalScriptPath"
                 }

@@ -19,13 +19,13 @@ function Update-RequestStatus {
         # Add to history
         $script:statusHistory += @{
             message   = $message
-            timestamp = (Get-Date).ToString("yyyy-MM-dd HH:mm:ss")
+            timestamp = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")
         }
 
         $statusObj = @{
             status    = $status
             history   = $script:statusHistory
-            lastUpdated = (Get-Date).ToString("yyyy-MM-dd HH:mm:ss")
+            lastUpdated = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")
         }
         
         $tempPath = "$env:TEMP\$requestId.json"
@@ -190,7 +190,7 @@ if ($userMemberCount -gt 0) {
 
             if ($env:AZURE_STORAGE_CONNECTION_STRING) {
                 $blobName = Split-Path $csvFilePath -Leaf
-                az storage blob upload --container-name "reports" --file $csvFilePath --name $blobName --connection-string $env:AZURE_STORAGE_CONNECTION_STRING --overwrite --output none --auth-mode key
+                az storage blob upload --container-name "reports" --file $csvFilePath --name $blobName --connection-string $env:AZURE_STORAGE_CONNECTION_STRING --overwrite --output none --auth-mode key --only-show-errors --no-progress
             }
         }
         else {

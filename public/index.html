@@ -359,7 +359,7 @@
                         seenMessages.push(uniqueKey);
                         const msgDiv = document.createElement('div');
                         msgDiv.className = 'status-msg-item';
-                        msgDiv.innerHTML = `<strong>[${new Date(item.timestamp.replace(/-/g, '/')).toLocaleTimeString()}]</strong> ${item.message}`;
+                        msgDiv.innerHTML = `<strong>[${new Date(item.timestamp).toLocaleTimeString()}]</strong> ${item.message}`;
                         msgContainer.appendChild(msgDiv);
                         tracker.scrollTop = tracker.scrollHeight;
                     }

@@ -101,13 +101,10 @@ app.get('/api/poller-status', async (req, res) => {
         const body = await streamToBuffer(downloadResponse.readableStreamBody);
         const data = JSON.parse(body.toString('utf8'));
 
-        // Parse date carefully
-        const lastSeenStr = data.lastSeen.replace(/-/g, '/');
-        const lastSeen = new Date(lastSeenStr);
+        // Parse ISO 8601 UTC timestamp from Jump Server
+        const lastSeen = new Date(data.lastSeen);
         const now = new Date();
-        
-        // Calculate difference in minutes (absolute value to handle clock skew)
-        const diffMinutes = Math.abs(now - lastSeen) / 1000 / 60;
+        const diffMinutes = (now - lastSeen) / 1000 / 60;
 
         if (diffMinutes < 10) { 
             res.json({ status: 'Online', lastSeen: data.lastSeen, machine: data.machine });
