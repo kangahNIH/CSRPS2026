@@ -29,7 +29,7 @@ function Update-RequestStatus {
         }
         
         $tempPath = "$env:TEMP\$requestId.json"
-        $statusObj | ConvertTo-Json -Depth 5 | Set-Content -Path $tempPath -Encoding UTF8
+        $statusObj | ConvertTo-Json -Depth 5 | Out-String | ForEach-Object { [System.IO.File]::WriteAllText($tempPath, $_.Trim(), [System.Text.UTF8Encoding]::new($false)) }
         az storage blob upload --container-name "status" --file $tempPath --name "$requestId.json" --connection-string $env:AZURE_STORAGE_CONNECTION_STRING --overwrite --output none --auth-mode key --only-show-errors --no-progress
     }
 }

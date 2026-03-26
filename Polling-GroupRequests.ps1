@@ -17,7 +17,7 @@ while ($true) {
             machine  = $env:COMPUTERNAME
         }
         $heartbeatPath = "$env:TEMP\poller-heartbeat.json"
-        $heartbeat | ConvertTo-Json | Set-Content -Path $heartbeatPath -Encoding UTF8
+        $heartbeat | ConvertTo-Json | Out-String | ForEach-Object { [System.IO.File]::WriteAllText($heartbeatPath, $_.Trim(), [System.Text.UTF8Encoding]::new($false)) }
         # Added --only-show-errors and suppressed progress to reduce noise
         az storage blob upload --container-name "config" --file $heartbeatPath --name "poller-heartbeat.json" --connection-string $ConnectionString --overwrite --output none --auth-mode key --only-show-errors --no-progress
         # -------------------------

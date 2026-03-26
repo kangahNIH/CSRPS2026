@@ -99,7 +99,9 @@ app.get('/api/poller-status', async (req, res) => {
 
         const downloadResponse = await blobClient.download();
         const body = await streamToBuffer(downloadResponse.readableStreamBody);
-        const data = JSON.parse(body.toString('utf8'));
+        let content = body.toString('utf8');
+        if (content.charCodeAt(0) === 0xFEFF) content = content.slice(1);
+        const data = JSON.parse(content.trim());
 
         // Parse ISO 8601 UTC timestamp from Jump Server
         const lastSeen = new Date(data.lastSeen);
@@ -153,7 +155,8 @@ app.get('/api/status/:id', async (req, res) => {
         
         const downloadResponse = await blobClient.download();
         const body = await streamToBuffer(downloadResponse.readableStreamBody);
-        const content = body.toString('utf8');
+        let content = body.toString('utf8');
+        if (content.charCodeAt(0) === 0xFEFF) content = content.slice(1);
         try {
             res.json(JSON.parse(content.trim()));
         } catch (e) {
