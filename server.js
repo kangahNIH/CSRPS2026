@@ -190,5 +190,46 @@ app.post('/api/submit-groups', async (req, res) => {
     }
 });
 
+// API Endpoint: Get service account properties metadata
+app.get('/api/service-account-properties', async (req, res) => {
+    if (!blobServiceClient) return res.status(500).json({ message: 'Storage not configured.' });
+    try {
+        const containerClient = blobServiceClient.getContainerClient("config");
+        const blobClient = containerClient.getBlobClient("service-account-properties.json");
+
+        if (!(await blobClient.exists())) {
+            return res.status(404).json({ message: 'Service account properties not found. Run Export-ServiceAccountProperties.ps1 on the Jump Server.' });
+        }
+
+        const downloadResponse = await blobClient.download();
+        const body = await streamToBuffer(downloadResponse.readableStreamBody);
+        let content = body.toString('utf8');
+        if (content.charCodeAt(0) === 0xFEFF) content = content.slice(1);
+        res.status(200).json(JSON.parse(content.trim()));
+    } catch (err) {
+        res.status(500).json({ message: 'Failed to fetch service account properties.', error: err.message });
+    }
+});
+
+// API Endpoint: Submit service account report request
+app.post('/api/submit-service-account-report', async (req, res) => {
+    const { ouDN, selectedProperties } = req.body;
+    const requestId = `svc-${Date.now()}`;
+    if (!ouDN || !selectedProperties || !queueClient) return res.status(400).json({ message: 'Invalid request.' });
+    try {
+        const messageObj = {
+            requestId,
+            type: "service-account-report",
+            ouDN,
+            selectedProperties
+        };
+        const base64Message = Buffer.from(JSON.stringify(messageObj)).toString('base64');
+        await queueClient.sendMessage(base64Message);
+        res.status(200).json({ message: 'Service account report request submitted!', requestId });
+    } catch (err) {
+        res.status(500).json({ message: 'Queue error.', error: err.message });
+    }
+});
+
 app.get('*', (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
 app.listen(port, () => console.log(`Server is running on port ${port}`));

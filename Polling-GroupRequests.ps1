@@ -1,8 +1,9 @@
 # Polling-GroupRequests.ps1
 # This script runs on the Jump Server (CSRMGMT02)
-$StorageAccountName = "csrstpsadminstore" 
+$StorageAccountName = "csrstpsadminstore"
 $QueueName = "group-requests"
 $LocalScriptPath = "C:\STPS\CSRPS2026\CSRmemberLIST-RSAT.ps1"
+$ServiceAccountScriptPath = "C:\STPS\CSRPS2026\Query-ServiceAccounts.ps1"
 $PollIntervalSeconds = 60
 $ConnectionString = $env:AZURE_STORAGE_CONNECTION_STRING
 
@@ -33,18 +34,32 @@ while ($true) {
                 $data = $jsonStr | ConvertFrom-Json
                 
                 $requestId = $data.requestId
-                $groupNames = $data.groupNames
-                
-                Write-Host "Received Request [$requestId] for groups: $groupNames" -ForegroundColor Green
-                
-                if (Test-Path $LocalScriptPath) {
-                    # Execute with RequestID for status tracking
-                    & $LocalScriptPath -groupNamesInput $groupNames -requestId $requestId
-                    
-                    az storage message delete --id $msg.id --pop-receipt $msg.popReceipt --queue-name $QueueName --connection-string $ConnectionString --auth-mode key --only-show-errors
+                $requestType = $data.type
+
+                if ($requestType -eq "service-account-report") {
+                    # Handle Service Account report request
+                    $ouDN = $data.ouDN
+                    $selectedProperties = $data.selectedProperties
+                    Write-Host "Received Service Account Request [$requestId] for OU: $ouDN" -ForegroundColor Magenta
+
+                    if (Test-Path $ServiceAccountScriptPath) {
+                        & $ServiceAccountScriptPath -requestId $requestId -ouDN $ouDN -selectedProperties $selectedProperties
+                    } else {
+                        Write-Error "Service Account script not found at: $ServiceAccountScriptPath"
+                    }
                 } else {
-                    Write-Error "Local script not found at: $LocalScriptPath"
+                    # Handle Group Member request (existing behavior)
+                    $groupNames = $data.groupNames
+                    Write-Host "Received Request [$requestId] for groups: $groupNames" -ForegroundColor Green
+
+                    if (Test-Path $LocalScriptPath) {
+                        & $LocalScriptPath -groupNamesInput $groupNames -requestId $requestId
+                    } else {
+                        Write-Error "Local script not found at: $LocalScriptPath"
+                    }
                 }
+
+                az storage message delete --id $msg.id --pop-receipt $msg.popReceipt --queue-name $QueueName --connection-string $ConnectionString --auth-mode key --only-show-errors
             }
         } else {
             Write-Host "." -NoNewline

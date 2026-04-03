@@ -169,8 +169,94 @@
         }
 
         .version-tag { font-size: 0.7rem; color: #a1a1a1; text-align: right; margin-bottom: 0.5rem; display: block; }
-        
+
         .hint { font-size: 0.8rem; color: #605e5c; margin-bottom: 1rem; }
+
+        /* Tab Navigation */
+        .tab-nav {
+            display: flex;
+            gap: 0;
+            margin-bottom: 1.5rem;
+            border-bottom: 2px solid var(--border);
+        }
+        .tab-btn {
+            background: none;
+            color: #605e5c;
+            border: none;
+            padding: 10px 20px;
+            font-size: 0.95rem;
+            font-weight: 600;
+            cursor: pointer;
+            border-bottom: 3px solid transparent;
+            margin-bottom: -2px;
+            width: auto;
+            border-radius: 0;
+            transition: color 0.2s, border-color 0.2s;
+        }
+        .tab-btn:hover { color: var(--primary); background: none; }
+        .tab-btn.active {
+            color: var(--primary);
+            border-bottom-color: var(--primary);
+        }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+
+        /* Service Accounts Styles */
+        .property-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 6px;
+            max-height: 280px;
+            overflow-y: auto;
+            border: 1px solid #edebe9;
+            padding: 10px;
+            border-radius: 4px;
+            margin-bottom: 1rem;
+        }
+        .property-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 0.82rem;
+            padding: 4px 6px;
+            border-radius: 3px;
+            cursor: pointer;
+            transition: background 0.15s;
+        }
+        .property-item:hover { background: #f3f9ff; }
+        .property-item input[type="checkbox"] { margin: 0; cursor: pointer; }
+        .property-item label { cursor: pointer; user-select: none; }
+        .ou-selector {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            font-family: inherit;
+            font-size: 0.9rem;
+            margin-bottom: 1rem;
+        }
+        .prop-actions {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 8px;
+        }
+        .prop-actions button {
+            width: auto;
+            padding: 4px 10px;
+            font-size: 0.75rem;
+            background-color: #f3f2f1;
+            color: var(--text);
+            border: 1px solid var(--border);
+        }
+        .prop-actions button:hover { background-color: #e1dfdd; }
+        .sa-info {
+            font-size: 0.8rem;
+            color: #605e5c;
+            padding: 6px 10px;
+            background: #f8f9fa;
+            border-radius: 4px;
+            margin-bottom: 1rem;
+        }
 
         /* Poller Status Styles */
         .poller-status-container {
@@ -210,31 +296,76 @@
                     <span id="statusDot" class="status-dot status-unknown"></span>
                     <span id="statusText">System Status: Checking...</span>
                 </div>
-                <span class="version-tag">v.2026-03-24-heartbeat</span>
+                <span class="version-tag">v.2026-04-02-svc-accounts</span>
             </div>
-            <h1>Member Retrieval</h1>
-            <p>Select groups from the lists or type them manually below.</p>
-            
-            <form id="groupForm">
-                <div class="form-group">
-                    <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 5px;">
-                        <label for="groupNames"><b>Selected Groups</b></label>
-                        <button type="button" onclick="clearSelection()" style="width: auto; padding: 4px 8px; font-size: 0.75rem; background-color: #f3f2f1; color: var(--text); border: 1px solid var(--border);">Clear Selection</button>
+
+            <!-- Tab Navigation -->
+            <div class="tab-nav">
+                <button class="tab-btn active" onclick="switchTab('groups')">Group Members</button>
+                <button class="tab-btn" onclick="switchTab('serviceAccounts')">Service Accounts</button>
+            </div>
+
+            <!-- Tab 1: Group Members (existing) -->
+            <div id="tab-groups" class="tab-content active">
+                <h1>Member Retrieval</h1>
+                <p>Select groups from the lists or type them manually below.</p>
+
+                <form id="groupForm">
+                    <div class="form-group">
+                        <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 5px;">
+                            <label for="groupNames"><b>Selected Groups</b></label>
+                            <button type="button" onclick="clearSelection()" style="width: auto; padding: 4px 8px; font-size: 0.75rem; background-color: #f3f2f1; color: var(--text); border: 1px solid var(--border);">Clear Selection</button>
+                        </div>
+                        <textarea id="groupNames" name="groupNames" placeholder="Click groups to add them here..." required></textarea>
+                        <div class="hint">Multiple groups are separated by commas.</div>
                     </div>
-                    <textarea id="groupNames" name="groupNames" placeholder="Click groups to add them here..." required></textarea>
-                    <div class="hint">Multiple groups are separated by commas.</div>
+                    <button type="submit" id="submitBtn">Start Retrieval</button>
+                </form>
+
+                <div id="status" style="margin-top: 1rem; display: none; padding: 1rem; border-radius: 4px;"></div>
+
+                <div id="statusTracker" class="status-tracker">
+                    <h3 style="display: flex; justify-content: space-between;">Request Status <span id="trackerBadge" style="font-size: 0.7rem; padding: 2px 8px; border-radius: 10px; background: var(--primary); color: white;">Pending</span></h3>
+                    <div id="trackerMsg" style="font-size: 0.9rem; margin-bottom: 5px;"></div>
+                    <div id="trackerTime" style="font-size: 0.7rem; color: #605e5c;"></div>
                 </div>
-                <button type="submit" id="submitBtn">Start Retrieval</button>
-            </form>
-
-            <div id="status" style="margin-top: 1rem; display: none; padding: 1rem; border-radius: 4px;"></div>
-
-            <div id="statusTracker" class="status-tracker">
-                <h3 style="display: flex; justify-content: space-between;">Request Status <span id="trackerBadge" style="font-size: 0.7rem; padding: 2px 8px; border-radius: 10px; background: var(--primary); color: white;">Pending</span></h3>
-                <div id="trackerMsg" style="font-size: 0.9rem; margin-bottom: 5px;"></div>
-                <div id="trackerTime" style="font-size: 0.7rem; color: #605e5c;"></div>
             </div>
 
+            <!-- Tab 2: Service Accounts -->
+            <div id="tab-serviceAccounts" class="tab-content">
+                <h1>Service Account Reports</h1>
+                <p>Select an OU and choose which properties to include in the report.</p>
+
+                <div class="sa-info" id="saInfo">Loading service account metadata...</div>
+
+                <label for="ouSelect"><b>Organizational Unit</b></label>
+                <select id="ouSelect" class="ou-selector">
+                    <option value="OU=ServiceAccounts,OU=OPS,OU=CSR,OU=NIH,OU=AD,DC=nih,DC=gov">ServiceAccounts (OPS/CSR)</option>
+                </select>
+
+                <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 5px; margin-top: 1rem;">
+                    <label><b>Properties to Include</b></label>
+                    <div class="prop-actions">
+                        <button type="button" onclick="toggleAllProps(true)">Select All</button>
+                        <button type="button" onclick="toggleAllProps(false)">Deselect All</button>
+                    </div>
+                </div>
+                <div id="propertyGrid" class="property-grid">
+                    <div style="grid-column: 1/-1; color: #605e5c;">Loading properties...</div>
+                </div>
+
+                <button type="button" id="saSubmitBtn" onclick="submitServiceAccountReport()">Generate Report</button>
+
+                <div id="saStatus" style="margin-top: 1rem; display: none; padding: 1rem; border-radius: 4px;"></div>
+
+                <div id="saStatusTracker" class="status-tracker">
+                    <h3 style="display: flex; justify-content: space-between;">Request Status <span id="saTrackerBadge" style="font-size: 0.7rem; padding: 2px 8px; border-radius: 10px; background: var(--primary); color: white;">Pending</span></h3>
+                    <div id="saTrackerMsg" style="font-size: 0.9rem; margin-bottom: 5px;"></div>
+                    <div id="saTrackerTime" style="font-size: 0.7rem; color: #605e5c;"></div>
+                </div>
+            </div>
+
+            <!-- Shared Reports Section -->
             <div class="reports-section">
                 <div style="display: flex; justify-content: space-between; align-items: baseline;">
                     <h3>Recent Reports</h3>
@@ -258,9 +389,28 @@
 
     <script>
         let pollInterval = null;
+        let saPollInterval = null;
         let allSGs = [];
         let allDLs = [];
         let seenMessages = [];
+        let saSeenMessages = [];
+        let saProperties = [];
+
+        // Tab switching
+        function switchTab(tabName) {
+            document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(tc => tc.classList.remove('active'));
+            document.getElementById('tab-' + tabName).classList.add('active');
+            event.target.classList.add('active');
+
+            // Show/hide side panels based on tab
+            const sidePanels = document.querySelectorAll('.side-panel');
+            if (tabName === 'serviceAccounts') {
+                sidePanels.forEach(p => p.style.display = 'none');
+            } else {
+                sidePanels.forEach(p => p.style.display = 'flex');
+            }
+        }
 
         // Fetch Poller Status (Heartbeat)
         async function checkPollerStatus() {
@@ -429,11 +579,138 @@
             finally { submitBtn.disabled = false; }
         });
 
+        // --- Service Account Functions ---
+        async function fetchServiceAccountProperties() {
+            const grid = document.getElementById('propertyGrid');
+            const info = document.getElementById('saInfo');
+            try {
+                const response = await fetch('/api/service-account-properties');
+                if (!response.ok) {
+                    if (response.status === 404) {
+                        grid.innerHTML = '<div style="grid-column:1/-1; color:#a4262c;">Run Export-ServiceAccountProperties.ps1 on the Jump Server first.</div>';
+                        info.textContent = 'Property metadata not found.';
+                        return;
+                    }
+                    throw new Error(`HTTP ${response.status}`);
+                }
+                const data = await response.json();
+                saProperties = data.properties || [];
+                info.innerHTML = `<b>${data.totalAccounts}</b> accounts in <b>${data.ouFriendlyName || data.ou}</b> &mdash; Last scanned: ${data.lastUpdated}`;
+
+                if (saProperties.length === 0) {
+                    grid.innerHTML = '<div style="grid-column:1/-1;">No properties with content found.</div>';
+                    return;
+                }
+
+                // Default selected properties
+                const defaults = ['SamAccountName', 'Name', 'DisplayName', 'Description', 'Enabled', 'PasswordLastSet', 'LastLogonDate', 'WhenCreated'];
+                grid.innerHTML = saProperties.map(prop => {
+                    const checked = defaults.includes(prop) ? 'checked' : '';
+                    return `<div class="property-item">
+                        <input type="checkbox" id="prop-${prop}" value="${prop}" ${checked}>
+                        <label for="prop-${prop}">${prop}</label>
+                    </div>`;
+                }).join('');
+            } catch (err) {
+                console.error('Service Account Properties Error:', err);
+                grid.innerHTML = `<div style="grid-column:1/-1; color:#a4262c;">Error: ${err.message}</div>`;
+            }
+        }
+
+        function toggleAllProps(selectAll) {
+            document.querySelectorAll('#propertyGrid input[type="checkbox"]').forEach(cb => cb.checked = selectAll);
+        }
+
+        async function submitServiceAccountReport() {
+            const btn = document.getElementById('saSubmitBtn');
+            const statusDiv = document.getElementById('saStatus');
+            const msgContainer = document.getElementById('saTrackerMsg');
+
+            const ouDN = document.getElementById('ouSelect').value;
+            const selected = [];
+            document.querySelectorAll('#propertyGrid input[type="checkbox"]:checked').forEach(cb => selected.push(cb.value));
+
+            if (selected.length === 0) {
+                statusDiv.innerHTML = 'Please select at least one property.';
+                statusDiv.style.backgroundColor = '#fff4ce';
+                statusDiv.style.color = '#d83b01';
+                statusDiv.style.display = 'block';
+                return;
+            }
+
+            btn.disabled = true;
+            statusDiv.innerHTML = '<strong style="color: #d83b01;">Note:</strong> Process involves Azure, Jump Server, and AD. May take 1-2 mins. Please wait...';
+            statusDiv.style.backgroundColor = '#fff4ce';
+            statusDiv.style.color = '#323130';
+            statusDiv.style.display = 'block';
+            msgContainer.innerHTML = '';
+            saSeenMessages = [];
+
+            try {
+                const response = await fetch('/api/submit-service-account-report', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ ouDN, selectedProperties: selected.join(',') }),
+                });
+                const data = await response.json();
+                if (response.ok) {
+                    statusDiv.innerHTML = 'Request queued! Watch tracker below (may take 1-2 mins to start).';
+                    statusDiv.style.backgroundColor = '#dff6dd';
+                    statusDiv.style.color = '#107c10';
+
+                    if (saPollInterval) clearInterval(saPollInterval);
+                    pollSAStatus(data.requestId);
+                    saPollInterval = setInterval(() => pollSAStatus(data.requestId), 5000);
+                }
+            } catch (err) {
+                statusDiv.innerHTML = 'Submission failed due to network error.';
+                statusDiv.style.backgroundColor = '#fde7e9';
+                statusDiv.style.color = '#a4262c';
+            } finally {
+                btn.disabled = false;
+            }
+        }
+
+        async function pollSAStatus(requestId) {
+            const tracker = document.getElementById('saStatusTracker');
+            const badge = document.getElementById('saTrackerBadge');
+            const msgContainer = document.getElementById('saTrackerMsg');
+            const time = document.getElementById('saTrackerTime');
+            tracker.style.display = 'block';
+
+            try {
+                const response = await fetch(`/api/status/${requestId}`);
+                const data = await response.json();
+
+                badge.textContent = data.status;
+                if (data.lastUpdated) time.textContent = 'Last update: ' + data.lastUpdated;
+
+                const messagesToShow = data.history || [];
+                messagesToShow.forEach(item => {
+                    const uniqueKey = `${item.timestamp}-${item.message}`;
+                    if (!saSeenMessages.includes(uniqueKey)) {
+                        saSeenMessages.push(uniqueKey);
+                        const msgDiv = document.createElement('div');
+                        msgDiv.className = 'status-msg-item';
+                        msgDiv.innerHTML = `<strong>[${new Date(item.timestamp).toLocaleTimeString()}]</strong> ${item.message}`;
+                        msgContainer.appendChild(msgDiv);
+                        tracker.scrollTop = tracker.scrollHeight;
+                    }
+                });
+
+                if (data.status === 'Completed' || data.status === 'Failed') {
+                    clearInterval(saPollInterval);
+                    fetchReports();
+                }
+            } catch (err) { console.error(err); }
+        }
+
         // Init
         checkPollerStatus();
         setInterval(checkPollerStatus, 60000); // Check every minute
         fetchGroupLists();
         fetchReports();
+        fetchServiceAccountProperties();
         setInterval(fetchReports, 30000); // Refresh reports every 30 seconds
     </script>
 </body>
