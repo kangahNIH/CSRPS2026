@@ -6,6 +6,9 @@ $LocalScriptsDir = "C:\STPS\CSRPS2026"
 $LocalScriptPath = "$LocalScriptsDir\CSRmemberLIST-RSAT.ps1"
 $ServiceAccountScriptPath = "$LocalScriptsDir\Query-ServiceAccounts.ps1"
 $ExportPropertiesScriptPath = "$LocalScriptsDir\Export-ServiceAccountProperties.ps1"
+$OUAccountsScriptPath = "$LocalScriptsDir\Query-OUAccounts.ps1"
+$ExportOUPropertiesScriptPath = "$LocalScriptsDir\Export-OUProperties.ps1"
+$ExportOUTreeScriptPath = "$LocalScriptsDir\Export-OUTree.ps1"
 $PollIntervalSeconds = 60
 $ConnectionString = $env:AZURE_STORAGE_CONNECTION_STRING
 
@@ -61,11 +64,27 @@ function Invoke-PropertyExport {
     }
 }
 
+# --- Auto-Run: Export OU Tree ---
+function Invoke-OUTreeExport {
+    Write-Host "[Auto] Running Export-OUTree.ps1..." -ForegroundColor Magenta
+    try {
+        if (Test-Path $ExportOUTreeScriptPath) {
+            & $ExportOUTreeScriptPath
+            Write-Host "[Auto] OU tree export completed." -ForegroundColor Green
+        } else {
+            Write-Warning "[Auto] Export-OUTree.ps1 not found at: $ExportOUTreeScriptPath"
+        }
+    } catch {
+        Write-Warning "[Auto] OU tree export error: $($_.Exception.Message)"
+    }
+}
+
 Write-Host "Starting Polling for AD requests..." -ForegroundColor Cyan
 
-# --- Startup: Sync scripts and run property export immediately ---
+# --- Startup: Sync scripts, export properties and OU tree ---
 Sync-ScriptsFromAzure
 Invoke-PropertyExport
+Invoke-OUTreeExport
 
 # Track when the last property export ran (for daily re-run)
 $script:lastPropertyExport = Get-Date
@@ -89,9 +108,10 @@ while ($true) {
             $script:lastScriptSync = Get-Date
         }
 
-        # --- Periodic: Re-run property export once daily ---
+        # --- Periodic: Re-run property export and OU tree once daily ---
         if (((Get-Date) - $script:lastPropertyExport).TotalHours -ge 24) {
             Invoke-PropertyExport
+            Invoke-OUTreeExport
             $script:lastPropertyExport = Get-Date
         }
 
@@ -118,6 +138,27 @@ while ($true) {
                         & $ServiceAccountScriptPath -requestId $requestId -ouDN $ouDN -selectedProperties $selectedProperties
                     } else {
                         Write-Error "Service Account script not found at: $ServiceAccountScriptPath"
+                    }
+                } elseif ($requestType -eq "ou-report") {
+                    # Handle generic OU account report
+                    $ouDN = $data.ouDN
+                    $selectedProperties = $data.selectedProperties
+                    Write-Host "Received OU Report Request [$requestId] for OU: $ouDN" -ForegroundColor Blue
+
+                    if (Test-Path $OUAccountsScriptPath) {
+                        & $OUAccountsScriptPath -requestId $requestId -ouDN $ouDN -selectedProperties $selectedProperties
+                    } else {
+                        Write-Error "OU Accounts script not found at: $OUAccountsScriptPath"
+                    }
+                } elseif ($requestType -eq "ou-property-scan") {
+                    # Handle OU property discovery scan
+                    $ouDN = $data.ouDN
+                    Write-Host "Received OU Property Scan [$requestId] for OU: $ouDN" -ForegroundColor DarkCyan
+
+                    if (Test-Path $ExportOUPropertiesScriptPath) {
+                        & $ExportOUPropertiesScriptPath -ouDN $ouDN -requestId $requestId
+                    } else {
+                        Write-Error "Export-OUProperties.ps1 not found at: $ExportOUPropertiesScriptPath"
                     }
                 } else {
                     # Handle Group Member request (existing behavior)
