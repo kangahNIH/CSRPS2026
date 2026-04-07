@@ -258,6 +258,67 @@
             margin-bottom: 1rem;
         }
 
+        /* OU Browser Styles */
+        .ou-tree {
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            padding: 10px;
+            max-height: 340px;
+            overflow-y: auto;
+            background: #fafafa;
+            margin-bottom: 1rem;
+        }
+        .ou-node { user-select: none; }
+        .ou-node-row {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 4px 6px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.85rem;
+            transition: background 0.15s;
+        }
+        .ou-node-row:hover { background: #f3f9ff; }
+        .ou-node-row.selected { background: #deeffe; color: var(--primary); font-weight: 600; }
+        .ou-toggle {
+            width: 16px; height: 16px; font-size: 0.7rem;
+            display: flex; align-items: center; justify-content: center;
+            flex-shrink: 0; color: #605e5c; cursor: pointer;
+        }
+        .ou-name { flex: 1; }
+        .ou-count {
+            font-size: 0.72rem; color: #605e5c;
+            background: #f3f2f1; padding: 1px 6px; border-radius: 10px;
+        }
+        .ou-children { padding-left: 20px; }
+        .ou-children.collapsed { display: none; }
+        .ou-step {
+            display: flex; align-items: center; gap: 10px;
+            margin-bottom: 1.2rem;
+        }
+        .ou-step-num {
+            width: 24px; height: 24px; border-radius: 50%;
+            background: var(--primary); color: white;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 0.8rem; font-weight: 700; flex-shrink: 0;
+        }
+        .ou-step-num.done { background: var(--success); }
+        .ou-step-label { font-size: 0.9rem; font-weight: 600; color: var(--text); }
+        #ouStep2 { display: none; }
+        .ou-search {
+            width: 100%; padding: 6px 10px;
+            border: 1px solid var(--border); border-radius: 4px;
+            font-family: inherit; font-size: 0.85rem;
+            box-sizing: border-box; margin-bottom: 0.6rem;
+        }
+        .ou-selected-info {
+            font-size: 0.8rem; color: #605e5c;
+            padding: 6px 10px; background: #f0f9ff;
+            border-left: 3px solid var(--primary);
+            border-radius: 3px; margin-bottom: 1rem;
+        }
+
         /* Poller Status Styles */
         .poller-status-container {
             font-size: 0.75rem;
@@ -303,6 +364,7 @@
             <div class="tab-nav">
                 <button class="tab-btn active" onclick="switchTab('groups')">Group Members</button>
                 <button class="tab-btn" onclick="switchTab('serviceAccounts')">Service Accounts</button>
+                <button class="tab-btn" onclick="switchTab('ouBrowser')">OU Browser</button>
             </div>
 
             <!-- Tab 1: Group Members (existing) -->
@@ -365,6 +427,55 @@
                 </div>
             </div>
 
+            <!-- Tab 3: OU Browser -->
+            <div id="tab-ouBrowser" class="tab-content">
+                <h1>OU Browser</h1>
+                <p>Browse the CSR OU structure, select an OU, choose attributes, and generate a report.</p>
+
+                <!-- Step 1: Pick OU -->
+                <div class="ou-step">
+                    <div id="ouStep1Num" class="ou-step-num">1</div>
+                    <span class="ou-step-label">Select an Organizational Unit</span>
+                </div>
+                <input type="text" id="ouSearch" class="ou-search" placeholder="Filter OUs by name..." oninput="filterOUTree()">
+                <div id="ouTree" class="ou-tree"><em style="color:#605e5c;">Loading OU tree...</em></div>
+
+                <!-- Step 2: Pick Attributes -->
+                <div id="ouStep2">
+                    <div class="ou-step" style="margin-top:1.2rem;">
+                        <div id="ouStep2Num" class="ou-step-num">2</div>
+                        <span class="ou-step-label">Select Attributes to Include</span>
+                    </div>
+
+                    <div id="ouSelectedInfo" class="ou-selected-info">No OU selected.</div>
+
+                    <div id="ouPropsLoading" style="color:#605e5c; font-size:0.85rem; margin-bottom:1rem; display:none;">
+                        Scanning OU for available attributes — this takes ~1 min on first use...
+                        <div id="ouPropsScanStatus" style="font-size:0.8rem; margin-top:4px;"></div>
+                    </div>
+
+                    <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 5px;">
+                        <label><b>Properties to Include</b></label>
+                        <div class="prop-actions">
+                            <button type="button" onclick="toggleAllOUProps(true)">Select All</button>
+                            <button type="button" onclick="toggleAllOUProps(false)">Deselect All</button>
+                        </div>
+                    </div>
+                    <div id="ouPropertyGrid" class="property-grid">
+                        <div style="grid-column:1/-1; color:#605e5c;">Select an OU above to see available properties.</div>
+                    </div>
+
+                    <button type="button" id="ouSubmitBtn" onclick="submitOUReport()" disabled style="opacity:0.5;">Generate Report</button>
+
+                    <div id="ouStatus" style="margin-top: 1rem; display: none; padding: 1rem; border-radius: 4px;"></div>
+                    <div id="ouStatusTracker" class="status-tracker">
+                        <h3 style="display: flex; justify-content: space-between;">Request Status <span id="ouTrackerBadge" style="font-size: 0.7rem; padding: 2px 8px; border-radius: 10px; background: var(--primary); color: white;">Pending</span></h3>
+                        <div id="ouTrackerMsg" style="font-size: 0.9rem; margin-bottom: 5px;"></div>
+                        <div id="ouTrackerTime" style="font-size: 0.7rem; color: #605e5c;"></div>
+                    </div>
+                </div>
+            </div>
+
             <!-- Shared Reports Section -->
             <div class="reports-section">
                 <div style="display: flex; justify-content: space-between; align-items: baseline;">
@@ -405,7 +516,7 @@
 
             // Show/hide side panels based on tab
             const sidePanels = document.querySelectorAll('.side-panel');
-            if (tabName === 'serviceAccounts') {
+            if (tabName === 'serviceAccounts' || tabName === 'ouBrowser') {
                 sidePanels.forEach(p => p.style.display = 'none');
             } else {
                 sidePanels.forEach(p => p.style.display = 'flex');
@@ -705,12 +816,335 @@
             } catch (err) { console.error(err); }
         }
 
+        // =====================================================================
+        // OU Browser
+        // =====================================================================
+        let ouTreeData = null;          // full tree from API
+        let selectedOUDN = null;        // currently selected OU DN
+        let ouPollInterval = null;
+        let ouPropScanInterval = null;
+        let ouSeenMessages = [];
+
+        async function fetchOUTree() {
+            const container = document.getElementById('ouTree');
+            try {
+                const response = await fetch('/api/ou-tree');
+                if (!response.ok) {
+                    if (response.status === 404) {
+                        container.innerHTML = '<em style="color:#a4262c;">OU tree not found. Ensure Export-OUTree.ps1 has run on the Jump Server.</em>';
+                    } else {
+                        container.innerHTML = `<em style="color:#a4262c;">Error ${response.status} loading OU tree.</em>`;
+                    }
+                    return;
+                }
+                ouTreeData = await response.json();
+                renderOUTree();
+            } catch (err) {
+                container.innerHTML = `<em style="color:#a4262c;">Could not load OU tree: ${err.message}</em>`;
+            }
+        }
+
+        function filterOUTree() {
+            renderOUTree(document.getElementById('ouSearch').value.toLowerCase());
+        }
+
+        function renderOUTree(filter) {
+            const container = document.getElementById('ouTree');
+            if (!ouTreeData) return;
+            container.innerHTML = '';
+            container.appendChild(buildOUNodeEl(ouTreeData, filter || '', true));
+        }
+
+        function buildOUNodeEl(node, filter, forceExpand) {
+            const el = document.createElement('div');
+            el.className = 'ou-node';
+
+            const nameMatch = !filter || node.name.toLowerCase().includes(filter);
+            const childrenHTML = buildChildrenEl(node.children || [], filter, !!filter);
+
+            // Hide entire branch only if name doesn't match AND no children matched
+            if (filter && !nameMatch && childrenHTML.childElementCount === 0) {
+                el.style.display = 'none';
+                return el;
+            }
+
+            const hasChildren = (node.children || []).length > 0;
+            const isSelected = node.dn === selectedOUDN;
+            const startExpanded = forceExpand || !!filter || isSelected;
+
+            const row = document.createElement('div');
+            row.className = 'ou-node-row' + (isSelected ? ' selected' : '');
+            row.dataset.dn = node.dn;
+
+            const toggle = document.createElement('span');
+            toggle.className = 'ou-toggle';
+            toggle.textContent = hasChildren ? (startExpanded ? '▾' : '▸') : '';
+
+            const nameEl = document.createElement('span');
+            nameEl.className = 'ou-name';
+            nameEl.textContent = node.name;
+
+            const countEl = document.createElement('span');
+            countEl.className = 'ou-count';
+            countEl.textContent = node.accountCount > 0 ? `${node.accountCount} accts` : '';
+
+            row.appendChild(toggle);
+            row.appendChild(nameEl);
+            if (node.accountCount > 0) row.appendChild(countEl);
+
+            // Click row to select OU
+            row.addEventListener('click', (e) => {
+                e.stopPropagation();
+                if (hasChildren && e.target === toggle) {
+                    // Just toggle expand/collapse
+                    const childEl = el.querySelector(':scope > .ou-children');
+                    const collapsed = childEl.classList.toggle('collapsed');
+                    toggle.textContent = collapsed ? '▸' : '▾';
+                    return;
+                }
+                selectOU(node.dn, node.name, node.accountCount);
+            });
+
+            // Click toggle specifically
+            toggle.addEventListener('click', (e) => {
+                e.stopPropagation();
+                if (!hasChildren) return;
+                const childEl = el.querySelector(':scope > .ou-children');
+                const collapsed = childEl.classList.toggle('collapsed');
+                toggle.textContent = collapsed ? '▸' : '▾';
+            });
+
+            el.appendChild(row);
+
+            if (hasChildren) {
+                childrenHTML.className = 'ou-children' + (startExpanded ? '' : ' collapsed');
+                el.appendChild(childrenHTML);
+            }
+
+            return el;
+        }
+
+        function buildChildrenEl(children, filter, forceExpand) {
+            const container = document.createElement('div');
+            let visibleCount = 0;
+            (children || []).forEach(child => {
+                const childEl = buildOUNodeEl(child, filter, forceExpand);
+                if (childEl.style.display !== 'none') visibleCount++;
+                container.appendChild(childEl);
+            });
+            container._visibleCount = visibleCount;
+            container.childElementCount = visibleCount; // used by parent filter check
+            return container;
+        }
+
+        async function selectOU(dn, name, accountCount) {
+            selectedOUDN = dn;
+            // Re-render tree to highlight selection
+            renderOUTree(document.getElementById('ouSearch').value.toLowerCase());
+
+            // Mark step 1 done
+            document.getElementById('ouStep1Num').classList.add('done');
+            document.getElementById('ouStep1Num').textContent = '✓';
+
+            // Show step 2
+            document.getElementById('ouStep2').style.display = 'block';
+            document.getElementById('ouSelectedInfo').innerHTML =
+                `<b>${name}</b> &mdash; DN: <code style="font-size:0.75rem;">${dn}</code>` +
+                (accountCount > 0 ? ` &mdash; ${accountCount} direct accounts` : '');
+
+            // Reset property grid
+            const grid = document.getElementById('ouPropertyGrid');
+            grid.innerHTML = '<div style="grid-column:1/-1; color:#605e5c;">Loading available properties...</div>';
+            document.getElementById('ouSubmitBtn').disabled = true;
+            document.getElementById('ouSubmitBtn').style.opacity = '0.5';
+            document.getElementById('ouPropsLoading').style.display = 'none';
+
+            // Try to load cached properties
+            await loadOUProperties(dn);
+        }
+
+        async function loadOUProperties(dn) {
+            try {
+                const response = await fetch(`/api/ou-properties?dn=${encodeURIComponent(dn)}`);
+                if (response.ok) {
+                    const data = await response.json();
+                    renderOUPropertyGrid(data);
+                    return;
+                }
+                if (response.status === 404) {
+                    // Trigger a scan
+                    await triggerOUPropertyScan(dn);
+                }
+            } catch (err) {
+                document.getElementById('ouPropertyGrid').innerHTML =
+                    `<div style="grid-column:1/-1; color:#a4262c;">Error: ${err.message}</div>`;
+            }
+        }
+
+        async function triggerOUPropertyScan(dn) {
+            const loadingDiv = document.getElementById('ouPropsLoading');
+            const grid = document.getElementById('ouPropertyGrid');
+            const scanStatus = document.getElementById('ouPropsScanStatus');
+
+            loadingDiv.style.display = 'block';
+            grid.innerHTML = '';
+            scanStatus.textContent = 'Queuing property scan...';
+
+            try {
+                const response = await fetch('/api/scan-ou-properties', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ ouDN: dn }),
+                });
+                const data = await response.json();
+                if (!response.ok) {
+                    scanStatus.textContent = 'Failed to queue scan: ' + data.message;
+                    return;
+                }
+                scanStatus.textContent = 'Scan queued — waiting for Jump Server... (poll every 5s)';
+
+                // Poll status, then refresh properties when done
+                if (ouPropScanInterval) clearInterval(ouPropScanInterval);
+                ouPropScanInterval = setInterval(async () => {
+                    try {
+                        const st = await fetch(`/api/status/${data.requestId}`);
+                        const stData = await st.json();
+                        const lastMsg = (stData.history || []).slice(-1)[0];
+                        if (lastMsg) scanStatus.textContent = lastMsg.message;
+
+                        if (stData.status === 'Completed') {
+                            clearInterval(ouPropScanInterval);
+                            loadingDiv.style.display = 'none';
+                            await loadOUProperties(dn);
+                        } else if (stData.status === 'Failed') {
+                            clearInterval(ouPropScanInterval);
+                            grid.innerHTML = `<div style="grid-column:1/-1; color:#a4262c;">Scan failed: ${lastMsg ? lastMsg.message : 'Unknown error'}</div>`;
+                            loadingDiv.style.display = 'none';
+                        }
+                    } catch (e) { /* keep polling */ }
+                }, 5000);
+            } catch (err) {
+                scanStatus.textContent = 'Network error: ' + err.message;
+            }
+        }
+
+        const OU_DEFAULT_PROPS = ['SamAccountName','Name','DisplayName','Description','Enabled','PasswordLastSet','LastLogonDate','WhenCreated','DistinguishedName'];
+
+        function renderOUPropertyGrid(data) {
+            const grid = document.getElementById('ouPropertyGrid');
+            const props = data.properties || [];
+            if (props.length === 0) {
+                grid.innerHTML = '<div style="grid-column:1/-1;">No populated properties found in this OU.</div>';
+                return;
+            }
+            grid.innerHTML = props.map(prop => {
+                const checked = OU_DEFAULT_PROPS.includes(prop) ? 'checked' : '';
+                return `<div class="property-item">
+                    <input type="checkbox" id="ouprop-${prop}" value="${prop}" ${checked}>
+                    <label for="ouprop-${prop}">${prop}</label>
+                </div>`;
+            }).join('');
+            // Enable submit button
+            document.getElementById('ouSubmitBtn').disabled = false;
+            document.getElementById('ouSubmitBtn').style.opacity = '1';
+        }
+
+        function toggleAllOUProps(selectAll) {
+            document.querySelectorAll('#ouPropertyGrid input[type="checkbox"]').forEach(cb => cb.checked = selectAll);
+        }
+
+        async function pollOUStatus(requestId) {
+            const tracker = document.getElementById('ouStatusTracker');
+            const badge = document.getElementById('ouTrackerBadge');
+            const msgContainer = document.getElementById('ouTrackerMsg');
+            const time = document.getElementById('ouTrackerTime');
+            tracker.style.display = 'block';
+            try {
+                const response = await fetch(`/api/status/${requestId}`);
+                const data = await response.json();
+                badge.textContent = data.status;
+                if (data.lastUpdated) time.textContent = 'Last update: ' + data.lastUpdated;
+                const messagesToShow = data.history || [];
+                messagesToShow.forEach(item => {
+                    const uniqueKey = `${item.timestamp}-${item.message}`;
+                    if (!ouSeenMessages.includes(uniqueKey)) {
+                        ouSeenMessages.push(uniqueKey);
+                        const msgDiv = document.createElement('div');
+                        msgDiv.className = 'status-msg-item';
+                        msgDiv.innerHTML = `<strong>[${new Date(item.timestamp).toLocaleTimeString()}]</strong> ${item.message}`;
+                        msgContainer.appendChild(msgDiv);
+                        tracker.scrollTop = tracker.scrollHeight;
+                    }
+                });
+                if (data.status === 'Completed' || data.status === 'Failed') {
+                    clearInterval(ouPollInterval);
+                    fetchReports();
+                }
+            } catch (err) { console.error(err); }
+        }
+
+        async function submitOUReport() {
+            const btn = document.getElementById('ouSubmitBtn');
+            const statusDiv = document.getElementById('ouStatus');
+            const msgContainer = document.getElementById('ouTrackerMsg');
+
+            if (!selectedOUDN) {
+                statusDiv.innerHTML = 'Please select an OU first.';
+                statusDiv.style.backgroundColor = '#fff4ce';
+                statusDiv.style.color = '#d83b01';
+                statusDiv.style.display = 'block';
+                return;
+            }
+
+            const selected = [];
+            document.querySelectorAll('#ouPropertyGrid input[type="checkbox"]:checked').forEach(cb => selected.push(cb.value));
+            if (selected.length === 0) {
+                statusDiv.innerHTML = 'Please select at least one property.';
+                statusDiv.style.backgroundColor = '#fff4ce';
+                statusDiv.style.color = '#d83b01';
+                statusDiv.style.display = 'block';
+                return;
+            }
+
+            btn.disabled = true;
+            statusDiv.innerHTML = '<strong style="color:#d83b01;">Note:</strong> Querying AD may take 1-2 mins. Please wait...';
+            statusDiv.style.backgroundColor = '#fff4ce';
+            statusDiv.style.color = '#323130';
+            statusDiv.style.display = 'block';
+            msgContainer.innerHTML = '';
+            ouSeenMessages = [];
+
+            try {
+                const response = await fetch('/api/submit-ou-report', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ ouDN: selectedOUDN, selectedProperties: selected.join(',') }),
+                });
+                const data = await response.json();
+                if (response.ok) {
+                    statusDiv.innerHTML = 'Request queued! Watch tracker below (may take 1-2 mins to start).';
+                    statusDiv.style.backgroundColor = '#dff6dd';
+                    statusDiv.style.color = '#107c10';
+                    if (ouPollInterval) clearInterval(ouPollInterval);
+                    pollOUStatus(data.requestId);
+                    ouPollInterval = setInterval(() => pollOUStatus(data.requestId), 5000);
+                }
+            } catch (err) {
+                statusDiv.innerHTML = 'Submission failed: ' + err.message;
+                statusDiv.style.backgroundColor = '#fde7e9';
+                statusDiv.style.color = '#a4262c';
+            } finally {
+                btn.disabled = false;
+            }
+        }
+
         // Init
         checkPollerStatus();
         setInterval(checkPollerStatus, 60000); // Check every minute
         fetchGroupLists();
         fetchReports();
         fetchServiceAccountProperties();
+        fetchOUTree();
         setInterval(fetchReports, 30000); // Refresh reports every 30 seconds
     </script>
 </body>

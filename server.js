@@ -211,6 +211,78 @@ app.get('/api/service-account-properties', async (req, res) => {
     }
 });
 
+// API Endpoint: Get OU tree (config/ou-tree.json from blob)
+app.get('/api/ou-tree', async (req, res) => {
+    if (!blobServiceClient) return res.status(500).json({ message: 'Storage not configured.' });
+    try {
+        const containerClient = blobServiceClient.getContainerClient("config");
+        const blobClient = containerClient.getBlobClient("ou-tree.json");
+        if (!(await blobClient.exists())) {
+            return res.status(404).json({ message: 'OU tree not found. Ensure Export-OUTree.ps1 has run on the Jump Server.' });
+        }
+        const downloadResponse = await blobClient.download();
+        const body = await streamToBuffer(downloadResponse.readableStreamBody);
+        let content = body.toString('utf8');
+        if (content.charCodeAt(0) === 0xFEFF) content = content.slice(1);
+        res.status(200).json(JSON.parse(content.trim()));
+    } catch (err) {
+        res.status(500).json({ message: 'Failed to fetch OU tree.', error: err.message });
+    }
+});
+
+// API Endpoint: Get cached OU properties for a specific OU DN
+// ?dn=OU=CSR,OU=NIH,... — server derives the blob name from the DN
+app.get('/api/ou-properties', async (req, res) => {
+    if (!blobServiceClient) return res.status(500).json({ message: 'Storage not configured.' });
+    const ouDN = req.query.dn;
+    if (!ouDN) return res.status(400).json({ message: 'Missing ?dn= parameter.' });
+    try {
+        const safeName = ouDN.replace(/OU=|DC=/g, '').replace(/[,=]/g, '_').replace(/_+/g, '_').replace(/^_|_$/g, '');
+        const containerClient = blobServiceClient.getContainerClient("config");
+        const blobClient = containerClient.getBlobClient(`ou-props/${safeName}.json`);
+        if (!(await blobClient.exists())) {
+            return res.status(404).json({ message: 'Properties not yet scanned for this OU.' });
+        }
+        const downloadResponse = await blobClient.download();
+        const body = await streamToBuffer(downloadResponse.readableStreamBody);
+        let content = body.toString('utf8');
+        if (content.charCodeAt(0) === 0xFEFF) content = content.slice(1);
+        res.status(200).json(JSON.parse(content.trim()));
+    } catch (err) {
+        res.status(500).json({ message: 'Failed to fetch OU properties.', error: err.message });
+    }
+});
+
+// API Endpoint: Queue an OU property scan
+app.post('/api/scan-ou-properties', async (req, res) => {
+    const { ouDN } = req.body;
+    const requestId = `ouprops-${Date.now()}`;
+    if (!ouDN || !queueClient) return res.status(400).json({ message: 'Invalid request.' });
+    try {
+        const messageObj = { requestId, type: 'ou-property-scan', ouDN };
+        const base64Message = Buffer.from(JSON.stringify(messageObj)).toString('base64');
+        await queueClient.sendMessage(base64Message);
+        res.status(200).json({ message: 'Property scan queued!', requestId });
+    } catch (err) {
+        res.status(500).json({ message: 'Queue error.', error: err.message });
+    }
+});
+
+// API Endpoint: Submit OU account report request
+app.post('/api/submit-ou-report', async (req, res) => {
+    const { ouDN, selectedProperties } = req.body;
+    const requestId = `ou-${Date.now()}`;
+    if (!ouDN || !selectedProperties || !queueClient) return res.status(400).json({ message: 'Invalid request.' });
+    try {
+        const messageObj = { requestId, type: 'ou-report', ouDN, selectedProperties };
+        const base64Message = Buffer.from(JSON.stringify(messageObj)).toString('base64');
+        await queueClient.sendMessage(base64Message);
+        res.status(200).json({ message: 'OU report request submitted!', requestId });
+    } catch (err) {
+        res.status(500).json({ message: 'Queue error.', error: err.message });
+    }
+});
+
 // API Endpoint: Submit service account report request
 app.post('/api/submit-service-account-report', async (req, res) => {
     const { ouDN, selectedProperties } = req.body;
