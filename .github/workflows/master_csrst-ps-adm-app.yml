@@ -37,26 +37,6 @@ jobs:
             .
             ! .git
 
-  upload-scripts:
-    runs-on: ubuntu-latest
-    needs: build
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Install Azure CLI
-        run: curl -sL https://aka.ms/InstallAzureCLIDeb | sudo bash
-
-      - name: Upload PowerShell scripts to Azure Blob
-        run: |
-          az storage blob upload-batch \
-            --destination "scripts" \
-            --source "." \
-            --pattern "*.ps1" \
-            --connection-string "${{ secrets.AZURE_STORAGE_CONNECTION_STRING }}" \
-            --overwrite \
-            --auth-mode key \
-            --only-show-errors
-
   deploy:
     runs-on: ubuntu-latest
     needs: build
