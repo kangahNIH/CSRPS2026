@@ -33,6 +33,16 @@ URL: https://csrst-ps-adm-app-egcbevftg6fjd0fu.eastus2-01.azurewebsites.net/
 - Excludes noisy/internal attrs (`nTSecurityDescriptor`, etc.) from the discoverable property list.
 - Deployment: PS1 files uploaded directly to `scripts` blob container; Jump Server picks them up on next 10-min sync.
 
+### 2026-05-11 — OU report: switch to inclusion-based filtering (accounts only)
+- **Fix**: The Server2019 report still included 15 `printQueue` objects mixed in with the computer rows. Rather than keep adding classes to an ever-growing exclusion list (DFSR → SCP → contact → printQueue → …), flipped the filter to **inclusion-based**.
+- New LDAP filter: `(|(objectClass=user)(objectClass=computer)(objectClass=group))`. Because AD classes inherit, this covers:
+  - `user` → users + `inetOrgPerson`
+  - `computer` → computers + `msDS-ManagedServiceAccount` + `msDS-GroupManagedServiceAccount`
+  - `group` → all group types (security/distribution, universal/global/local)
+- Everything else (printQueues, DFSR replication metadata, Service Connection Points, FRS legacy, internal containers, crypto-policy contacts, foreign security principals) is excluded by virtue of not being on the inclusion list. Robust against new AD schema additions — no more whack-a-mole.
+- Result: Server2019 returns only the ~49 computer objects, Server2016 returns only its ~36 computers, Users OU returns only users + groups, etc. Matches what ADUC's default views show.
+- Applied identically to `Query-OUAccounts.ps1` and `Export-OUProperties.ps1` so the property picker reflects the same population as the report.
+
 ### 2026-05-11 — OU report: also exclude GPO crypto-policy "contact" stubs
 - **Fix**: The Server2016 report still showed 8 `contact`-class rows with names like `CryptoPolicy` (Description `EncryptThenMac`) and bare GUIDs. These aren't real contacts — they're GPO-deployed TLS/Schannel cipher policy stubs that Windows stores as `contact` objects under the OU so domain-joined machines can discover the policy. ADUC hides them by default.
 - Added `contact` and `foreignSecurityPrincipal` to the default exclusion list in both `Query-OUAccounts.ps1` and `Export-OUProperties.ps1`.

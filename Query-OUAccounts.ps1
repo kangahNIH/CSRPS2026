@@ -75,24 +75,18 @@ $adParams = @{ ErrorAction = 'Stop'; Server = "nih.gov" }
 # it appears as a column even if the user didn't pick it.
 $outputColumns = @('ObjectClass') + @($properties | Where-Object { $_ -ne 'ObjectClass' })
 
-# Filter out nested OUs and AD infrastructure objects (DFSR replication metadata,
-# Service Connection Points registered by VMs, FRS legacy objects, internal CN=
-# containers, cryptographic policy stubs stored as 'contact' objects, foreign
-# security principals from external trusts, etc.). What remains is the same set
-# Active Directory Users and Computers shows by default: users, computers,
-# groups, MSAs, real contacts with content, printers, shared folders, etc.
-$excludedClasses = @(
-    'organizationalUnit',
-    'container',
-    'contact',                  # AD-side crypto policy stubs (EncryptThenMac, etc.) get stored as 'contact'
-    'foreignSecurityPrincipal', # SIDs from trusted external domains — not real accounts in this OU
-    'msDFSR-Subscription','msDFSR-Subscriber','msDFSR-LocalSettings',
-    'msDFSR-Topology','msDFSR-Content','msDFSR-ContentSet','msDFSR-Member',
-    'serviceConnectionPoint',
-    'rpcContainer',
-    'nTFRSSubscriber','nTFRSSubscriptions','nTFRSReplicaSet','nTFRSSettings','nTFRSMember'
-)
-$ldapFilter = '(&' + (($excludedClasses | ForEach-Object { "(!(objectClass=$_))" }) -join '') + ')'
+# Include only standard account-bearing object classes. Inclusion-based filtering
+# is more robust than exclusion: AD has dozens of infrastructure classes (DFSR
+# metadata, SCPs, crypto-policy contacts, printQueues, FRS, foreignSecurityPrincipal,
+# rpcContainer, ...) and chasing them all is fragile. Three classes cover what an
+# operator actually wants in a report:
+#   user     → user, inetOrgPerson
+#   computer → computer, msDS-ManagedServiceAccount, msDS-GroupManagedServiceAccount
+#   group    → all group types (security, distribution, universal/global/local)
+# This matches the population AD Users and Computers shows by default in the
+# Users/Computers/Builtin views.
+$includedClasses = @('user','computer','group')
+$ldapFilter = '(|' + (($includedClasses | ForEach-Object { "(objectClass=$_)" }) -join '') + ')'
 
 # Get-ADObject only accepts raw LDAP attribute names. The legacy Get-ADUser cmdlet
 # exposed many friendly/computed properties (Enabled, PasswordLastSet, EmailAddress,

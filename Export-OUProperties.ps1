@@ -106,24 +106,17 @@ try {
     exit 1
 }
 
-# Exclude nested OUs and AD infrastructure plumbing — DFSR replication metadata,
-# SCPs registered by VMs, legacy FRS objects, internal CN= containers, GPO-deployed
-# cryptographic/Schannel policy stubs stored as 'contact' objects, and foreign
-# security principals from external trusts. Keeps the filter in sync with
-# Query-OUAccounts.ps1 so the property scan reflects the same population the
-# actual report will produce.
-$excludedClasses = @(
-    'organizationalUnit',
-    'container',
-    'contact',                  # GPO crypto policy stubs (EncryptThenMac etc.) — hidden by ADUC
-    'foreignSecurityPrincipal',
-    'msDFSR-Subscription','msDFSR-Subscriber','msDFSR-LocalSettings',
-    'msDFSR-Topology','msDFSR-Content','msDFSR-ContentSet','msDFSR-Member',
-    'serviceConnectionPoint',
-    'rpcContainer',
-    'nTFRSSubscriber','nTFRSSubscriptions','nTFRSReplicaSet','nTFRSSettings','nTFRSMember'
-)
-$ldapFilter = '(&' + (($excludedClasses | ForEach-Object { "(!(objectClass=$_))" }) -join '') + ')'
+# Include only standard account-bearing object classes (user, computer, group).
+# Inclusion-based filter mirrors Query-OUAccounts.ps1 so the property scan covers
+# exactly the population the actual report will produce.
+#   user     → user, inetOrgPerson
+#   computer → computer, msDS-ManagedServiceAccount, msDS-GroupManagedServiceAccount
+#   group    → all group types
+# Infrastructure classes (DFSR, SCP, FRS, container, contact-as-crypto-policy,
+# printQueue, foreignSecurityPrincipal, etc.) are out by virtue of not being
+# listed — robust against new schema additions.
+$includedClasses = @('user','computer','group')
+$ldapFilter = '(|' + (($includedClasses | ForEach-Object { "(objectClass=$_)" }) -join '') + ')'
 
 try {
     # ResultSetSize limits the server-side LDAP page, so we don't drag the whole
