@@ -321,7 +321,7 @@
             border: 1px solid var(--border);
             border-radius: 4px;
             padding: 10px;
-            max-height: 340px;
+            max-height: 380px;
             overflow-y: auto;
             background: #fafafa;
             margin-bottom: 1rem;
@@ -330,26 +330,47 @@
         .ou-node-row {
             display: flex;
             align-items: center;
-            gap: 6px;
-            padding: 4px 6px;
+            gap: 4px;
+            padding: 5px 6px;
             border-radius: 4px;
             cursor: pointer;
             font-size: 0.85rem;
-            transition: background 0.15s;
+            transition: background 0.15s, box-shadow 0.15s;
         }
         .ou-node-row:hover { background: #f3f9ff; }
-        .ou-node-row.selected { background: #deeffe; color: var(--primary); font-weight: 600; }
+        .ou-node-row.selected {
+            background: #cfe4fb;
+            color: var(--primary);
+            font-weight: 600;
+            box-shadow: inset 3px 0 0 var(--primary);
+        }
         .ou-toggle {
             width: 16px; height: 16px; font-size: 0.7rem;
             display: flex; align-items: center; justify-content: center;
             flex-shrink: 0; color: #605e5c; cursor: pointer;
+            border-radius: 3px;
         }
-        .ou-name { flex: 1; }
+        .ou-toggle:hover { background: #e1dfdd; color: var(--primary); }
+        .ou-toggle.empty { cursor: default; visibility: hidden; }
+        .ou-icon {
+            flex-shrink: 0;
+            width: 18px;
+            text-align: center;
+            font-size: 0.95rem;
+            line-height: 1;
+        }
+        .ou-name { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         .ou-count {
             font-size: 0.72rem; color: #605e5c;
             background: #f3f2f1; padding: 1px 6px; border-radius: 10px;
+            flex-shrink: 0;
         }
-        .ou-children { padding-left: 20px; }
+        .ou-node-row.selected .ou-count { background: #fff; color: var(--primary); }
+        .ou-children {
+            padding-left: 18px;
+            margin-left: 10px;
+            border-left: 1px dashed #c8c6c4;
+        }
         .ou-children.collapsed { display: none; }
         .ou-step {
             display: flex; align-items: center; gap: 10px;
@@ -417,7 +438,7 @@
                 </div>
                 <div style="display: flex; align-items: center;">
                     <button type="button" class="whats-new-link" onclick="openChangelog()">What's New</button>
-                    <span class="version-tag">v.2026-05-11-ou-objects</span>
+                    <span class="version-tag">v.2026-05-11-ou-tree-ux</span>
                 </div>
             </div>
 
@@ -882,9 +903,35 @@
         // =====================================================================
         let ouTreeData = null;          // full tree from API
         let selectedOUDN = null;        // currently selected OU DN
+        let expandedOUDNs = new Set();  // DNs that should render expanded (survives re-renders)
         let ouPollInterval = null;
         let ouPropScanInterval = null;
         let ouSeenMessages = [];
+
+        // Walk the tree to find a node by DN, returning the chain of ancestor DNs.
+        function findOUAncestors(targetDN, node, ancestors) {
+            if (!node) return null;
+            if (node.dn === targetDN) return ancestors;
+            for (const child of (node.children || [])) {
+                const found = findOUAncestors(targetDN, child, ancestors.concat(node.dn));
+                if (found) return found;
+            }
+            return null;
+        }
+
+        // Scroll the currently-selected row to the vertical center of the OU tree
+        // pane. Manual calculation (rather than scrollIntoView) so the surrounding
+        // page never scrolls — only the tree container moves.
+        function scrollSelectedOUIntoView() {
+            const tree = document.getElementById('ouTree');
+            if (!tree) return;
+            const sel = tree.querySelector('.ou-node-row.selected');
+            if (!sel) return;
+            const treeRect = tree.getBoundingClientRect();
+            const selRect = sel.getBoundingClientRect();
+            const delta = (selRect.top - treeRect.top) - (tree.clientHeight / 2) + (sel.clientHeight / 2);
+            tree.scrollTo({ top: tree.scrollTop + delta, behavior: 'smooth' });
+        }
 
         async function fetchOUTree() {
             const container = document.getElementById('ouTree');
@@ -931,48 +978,60 @@
 
             const hasChildren = (node.children || []).length > 0;
             const isSelected = node.dn === selectedOUDN;
-            const startExpanded = forceExpand || !!filter || isSelected;
+            // Persist user's expand/collapse state across re-renders via expandedOUDNs.
+            // Filter mode and root always expand; ancestors of the selected node are
+            // added to expandedOUDNs by selectOU, so the path stays visible.
+            const startExpanded = forceExpand || !!filter || expandedOUDNs.has(node.dn);
 
             const row = document.createElement('div');
             row.className = 'ou-node-row' + (isSelected ? ' selected' : '');
             row.dataset.dn = node.dn;
 
             const toggle = document.createElement('span');
-            toggle.className = 'ou-toggle';
+            toggle.className = 'ou-toggle' + (hasChildren ? '' : ' empty');
             toggle.textContent = hasChildren ? (startExpanded ? '▾' : '▸') : '';
+
+            const icon = document.createElement('span');
+            icon.className = 'ou-icon';
+            if (hasChildren) {
+                icon.textContent = startExpanded ? '📂' : '📁';
+            } else {
+                icon.textContent = '📄';
+            }
 
             const nameEl = document.createElement('span');
             nameEl.className = 'ou-name';
             nameEl.textContent = node.name;
+            nameEl.title = node.dn;
 
             const countEl = document.createElement('span');
             countEl.className = 'ou-count';
             countEl.textContent = node.accountCount > 0 ? `${node.accountCount} accts` : '';
 
             row.appendChild(toggle);
+            row.appendChild(icon);
             row.appendChild(nameEl);
             if (node.accountCount > 0) row.appendChild(countEl);
 
-            // Click row to select OU
-            row.addEventListener('click', (e) => {
-                e.stopPropagation();
-                if (hasChildren && e.target === toggle) {
-                    // Just toggle expand/collapse
-                    const childEl = el.querySelector(':scope > .ou-children');
-                    const collapsed = childEl.classList.toggle('collapsed');
-                    toggle.textContent = collapsed ? '▸' : '▾';
-                    return;
-                }
-                selectOU(node.dn, node.name, node.accountCount);
-            });
-
-            // Click toggle specifically
-            toggle.addEventListener('click', (e) => {
-                e.stopPropagation();
+            function toggleExpanded() {
                 if (!hasChildren) return;
                 const childEl = el.querySelector(':scope > .ou-children');
                 const collapsed = childEl.classList.toggle('collapsed');
                 toggle.textContent = collapsed ? '▸' : '▾';
+                icon.textContent = collapsed ? '📁' : '📂';
+                if (collapsed) expandedOUDNs.delete(node.dn);
+                else expandedOUDNs.add(node.dn);
+            }
+
+            // Click toggle or icon → expand/collapse only
+            toggle.addEventListener('click', (e) => { e.stopPropagation(); toggleExpanded(); });
+            icon.addEventListener('click', (e) => { e.stopPropagation(); toggleExpanded(); });
+
+            // Click row (name) → select OU
+            row.addEventListener('click', (e) => {
+                e.stopPropagation();
+                if (e.target === toggle || e.target === icon) return; // handled above
+                selectOU(node.dn, node.name, node.accountCount);
             });
 
             el.appendChild(row);
@@ -1000,8 +1059,20 @@
 
         async function selectOU(dn, name, accountCount) {
             selectedOUDN = dn;
+            // Make sure every ancestor of the selected node is expanded so the
+            // selection stays visible after we re-render. Without this, the
+            // manually-expanded path collapses on rebuild.
+            const ancestors = findOUAncestors(dn, ouTreeData, []) || [];
+            ancestors.forEach(a => expandedOUDNs.add(a));
+            // Also keep the selected node itself expanded if it has children.
+            expandedOUDNs.add(dn);
+
             // Re-render tree to highlight selection
             renderOUTree(document.getElementById('ouSearch').value.toLowerCase());
+
+            // Scroll selected row into the center of the tree pane.
+            // Use a microtask so the DOM is settled before we measure.
+            requestAnimationFrame(scrollSelectedOUIntoView);
 
             // Mark step 1 done
             document.getElementById('ouStep1Num').classList.add('done');

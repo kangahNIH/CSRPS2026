@@ -33,6 +33,13 @@ URL: https://csrst-ps-adm-app-egcbevftg6fjd0fu.eastus2-01.azurewebsites.net/
 - Excludes noisy/internal attrs (`nTSecurityDescriptor`, etc.) from the discoverable property list.
 - Deployment: PS1 files uploaded directly to `scripts` blob container; Jump Server picks them up on next 10-min sync.
 
+### 2026-05-11 — OU tree UX: visual hierarchy + sticky selection
+- The OU Browser tree now shows folder icons (📁 closed / 📂 open / 📄 leaf), dashed vertical connector lines between parent and children, and a thicker left-bar accent on the selected row — so the hierarchy is obvious at a glance.
+- **Sticky selection**: selecting a deeply-nested OU no longer collapses its ancestors. Expand state is tracked in a JS `Set` that survives every re-render; `selectOU` adds every ancestor DN to that set before redrawing.
+- **Centered scroll**: after selection, the selected row is scrolled to the vertical center of the OU tree pane (the surrounding page does not move).
+- Toggle arrow and folder icon are now independent click targets for expand/collapse; clicking the node name selects the OU.
+- Long OU names truncate with an ellipsis (full DN shown on hover via `title`).
+
 ### 2026-05-11 — In-app "What's New" changelog
 - Added `What's New` button in the header (next to the version tag) that opens a modal displaying this changelog.
 - New backend endpoint: `GET /api/changelog` — serves `CHANGELOG.md` as raw markdown.
