@@ -33,6 +33,10 @@ URL: https://csrst-ps-adm-app-egcbevftg6fjd0fu.eastus2-01.azurewebsites.net/
 - Excludes noisy/internal attrs (`nTSecurityDescriptor`, etc.) from the discoverable property list.
 - Deployment: PS1 files uploaded directly to `scripts` blob container; Jump Server picks them up on next 10-min sync.
 
+### 2026-05-11 — OU report: Name as first column + previous upload re-uploaded
+- **Fix**: The inclusion-based filter from the previous entry didn't actually take effect — the Servers 2019 report still returned 15 `printQueue` rows. Investigation revealed the prior blob upload silently failed (the blob's `lastModified` updated but the content was stale). Re-uploaded `Query-OUAccounts.ps1` and verified the blob content matches the local file before exiting. Future uploads now include a download-and-grep verification step.
+- **UX**: Column ordering now puts `Name` first (after the `No.` index), then `ObjectClass`, then user-selected properties in their original order. `Name` is the natural identifier when scanning a CSV; burying it at the end was unhelpful. Both `Name` and `ObjectClass` are auto-included even if the user doesn't tick them.
+
 ### 2026-05-11 — OU report: switch to inclusion-based filtering (accounts only)
 - **Fix**: The Server2019 report still included 15 `printQueue` objects mixed in with the computer rows. Rather than keep adding classes to an ever-growing exclusion list (DFSR → SCP → contact → printQueue → …), flipped the filter to **inclusion-based**.
 - New LDAP filter: `(|(objectClass=user)(objectClass=computer)(objectClass=group))`. Because AD classes inherit, this covers:

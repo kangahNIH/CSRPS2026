@@ -70,10 +70,12 @@ if (-not (Test-Path -Path $reportPath)) {
 
 $adParams = @{ ErrorAction = 'Stop'; Server = "nih.gov" }
 
-# Ensure ObjectClass is always included so users can see what type each row is.
-# Get-ADObject returns ObjectClass by default, but listing it explicitly guarantees
-# it appears as a column even if the user didn't pick it.
-$outputColumns = @('ObjectClass') + @($properties | Where-Object { $_ -ne 'ObjectClass' })
+# Column ordering: Name first (most useful identifier for users scanning the
+# CSV), then ObjectClass, then whatever else the user picked in their original
+# selection order. Both Name and ObjectClass are auto-included even if the user
+# didn't tick them — they're cheap, universally useful columns.
+$leadingColumns = @('Name','ObjectClass')
+$outputColumns  = @($leadingColumns) + @($properties | Where-Object { $leadingColumns -notcontains $_ })
 
 # Include only standard account-bearing object classes. Inclusion-based filtering
 # is more robust than exclusion: AD has dozens of infrastructure classes (DFSR
