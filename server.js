@@ -2,6 +2,7 @@ require('dotenv').config();
 console.log("--- NODE SERVER STARTING ---");
 const express = require('express');
 const bodyParser = require('body-parser');
+const fs = require('fs');
 const path = require('path');
 const { QueueClient } = require("@azure/storage-queue");
 const { BlobServiceClient, StorageSharedKeyCredential } = require("@azure/storage-blob");
@@ -301,6 +302,17 @@ app.post('/api/submit-service-account-report', async (req, res) => {
     } catch (err) {
         res.status(500).json({ message: 'Queue error.', error: err.message });
     }
+});
+
+// API Endpoint: Serve CHANGELOG.md as raw markdown so the UI can render it.
+app.get('/api/changelog', (req, res) => {
+    const changelogPath = path.join(__dirname, 'CHANGELOG.md');
+    fs.readFile(changelogPath, 'utf8', (err, data) => {
+        if (err) {
+            return res.status(404).type('text/plain').send('# Changelog not available\n\nCHANGELOG.md was not found on the server.');
+        }
+        res.type('text/markdown; charset=utf-8').send(data);
+    });
 });
 
 app.get('*', (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));

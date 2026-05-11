@@ -31,7 +31,19 @@ URL: https://csrst-ps-adm-app-egcbevftg6fjd0fu.eastus2-01.azurewebsites.net/
 - `ObjectClass` is now always included as a column so each row shows what type it is.
 - Property discovery uses `Get-ADObject -Properties *` and dynamically discovers populated LDAP attributes — works for mixed-type OUs.
 - Excludes noisy/internal attrs (`nTSecurityDescriptor`, etc.) from the discoverable property list.
-- Deployment: PS1 files uploaded directly to `scripts` blob container; Jump Server picks them up on next 10-min sync. **Action required**: existing `config/ou-props/*.json` caches contain stale user-only property names — users should re-scan affected OUs to refresh.
+- Deployment: PS1 files uploaded directly to `scripts` blob container; Jump Server picks them up on next 10-min sync.
+
+### 2026-05-11 — In-app "What's New" changelog
+- Added `What's New` button in the header (next to the version tag) that opens a modal displaying this changelog.
+- New backend endpoint: `GET /api/changelog` — serves `CHANGELOG.md` as raw markdown.
+- Frontend renders the markdown client-side via `marked@12` loaded from jsDelivr CDN. Falls back to plain `<pre>` if the CDN is blocked.
+- End users can now read the change log without leaving the app or browsing the repo.
+
+### 2026-05-11 — OU Browser: friendly property name compatibility (patch)
+- **Fix**: First report against the WVD OU after the previous patch failed with `AD query error: One or more properties are invalid. Parameter name: PasswordLastSet`. Root cause: stale cached property lists (`config/ou-props/*.json`) still listed user-friendly names like `Enabled`, `PasswordLastSet`, `LastLogonDate`, `EmailAddress` that are computed by `Get-ADUser` but unknown to `Get-ADObject`.
+- `Query-OUAccounts.ps1` now maintains a `$friendlyAttrMap` that translates friendly property names → underlying LDAP attribute(s) at query time, and a `Get-FriendlyValue` helper that derives the friendly value from raw LDAP fields when building each row.
+- Mappings handled: `Enabled`, `PasswordNeverExpires`, `PasswordNotRequired`, `SmartcardLogonRequired` (decoded from `userAccountControl` bits); `PasswordLastSet`, `LastLogonDate`, `AccountExpirationDate` (converted from FileTime); `LockedOut` (derived from `lockoutTime`); `EmailAddress`/`OfficePhone`/`MobilePhone`/`HomePage`/`Surname`/`GivenName`/`Office`/`Country`/`BadLogonCount`/`ServicePrincipalNames` (aliased to their LDAP names).
+- Stale cached property lists now keep working — no need to re-scan OUs first.
 
 ### 2026-04-06 — OU Browser (initial release)
 - New `OU Browser` tab in the web UI (`public/index.html`).

@@ -170,6 +170,64 @@
 
         .version-tag { font-size: 0.7rem; color: #a1a1a1; text-align: right; margin-bottom: 0.5rem; display: block; }
 
+        .whats-new-link {
+            background: none;
+            color: var(--primary);
+            border: 1px solid var(--primary);
+            border-radius: 4px;
+            padding: 4px 10px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            cursor: pointer;
+            width: auto;
+            margin-right: 8px;
+        }
+        .whats-new-link:hover { background: var(--primary); color: #fff; }
+
+        .modal-overlay {
+            position: fixed; inset: 0;
+            background: rgba(0,0,0,0.45);
+            display: none;
+            align-items: center; justify-content: center;
+            z-index: 1000;
+            padding: 2rem;
+        }
+        .modal-overlay.open { display: flex; }
+        .modal-card {
+            background: #fff;
+            border-radius: 8px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.2);
+            max-width: 820px; width: 100%;
+            max-height: 80vh;
+            display: flex; flex-direction: column;
+            overflow: hidden;
+        }
+        .modal-header {
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 1rem 1.5rem;
+            border-bottom: 1px solid var(--border);
+        }
+        .modal-header h2 { margin: 0; font-size: 1.1rem; }
+        .modal-close {
+            background: none; color: #605e5c; border: none;
+            font-size: 1.5rem; cursor: pointer; width: auto; padding: 0 8px;
+        }
+        .modal-body {
+            padding: 1.25rem 1.5rem;
+            overflow-y: auto;
+            font-size: 0.9rem;
+            line-height: 1.55;
+        }
+        .modal-body h1 { font-size: 1.3rem; margin-top: 0; }
+        .modal-body h2 { font-size: 1.05rem; margin-top: 1.25rem; border-bottom: 1px solid #eee; padding-bottom: 4px; }
+        .modal-body h3 { font-size: 0.95rem; margin-top: 1rem; color: var(--primary); }
+        .modal-body code { background: #f3f2f1; padding: 1px 4px; border-radius: 3px; font-size: 0.85em; }
+        .modal-body pre { background: #f3f2f1; padding: 8px; border-radius: 4px; overflow-x: auto; }
+        .modal-body table { border-collapse: collapse; width: 100%; margin: 0.5rem 0; }
+        .modal-body th, .modal-body td { border: 1px solid var(--border); padding: 6px 10px; text-align: left; font-size: 0.85rem; }
+        .modal-body th { background: #f3f2f1; }
+        .modal-body hr { border: 0; border-top: 1px solid #eee; margin: 1.25rem 0; }
+
         .hint { font-size: 0.8rem; color: #605e5c; margin-bottom: 1rem; }
 
         /* Tab Navigation */
@@ -357,7 +415,10 @@
                     <span id="statusDot" class="status-dot status-unknown"></span>
                     <span id="statusText">System Status: Checking...</span>
                 </div>
-                <span class="version-tag">v.2026-04-02-svc-accounts</span>
+                <div style="display: flex; align-items: center;">
+                    <button type="button" class="whats-new-link" onclick="openChangelog()">What's New</button>
+                    <span class="version-tag">v.2026-05-11-ou-objects</span>
+                </div>
             </div>
 
             <!-- Tab Navigation -->
@@ -1138,6 +1199,36 @@
             }
         }
 
+        // What's New / Changelog modal
+        let changelogLoaded = false;
+        async function openChangelog() {
+            const overlay = document.getElementById('changelogModal');
+            const body = document.getElementById('changelogBody');
+            overlay.classList.add('open');
+            if (changelogLoaded) return;
+            body.textContent = 'Loading...';
+            try {
+                const res = await fetch('/api/changelog');
+                const md = await res.text();
+                if (window.marked) {
+                    body.innerHTML = window.marked.parse(md);
+                } else {
+                    // Fallback if CDN failed — show raw markdown in a <pre>
+                    const pre = document.createElement('pre');
+                    pre.style.whiteSpace = 'pre-wrap';
+                    pre.textContent = md;
+                    body.innerHTML = '';
+                    body.appendChild(pre);
+                }
+                changelogLoaded = true;
+            } catch (err) {
+                body.textContent = 'Failed to load changelog: ' + err.message;
+            }
+        }
+        function closeChangelog() {
+            document.getElementById('changelogModal').classList.remove('open');
+        }
+
         // Init
         checkPollerStatus();
         setInterval(checkPollerStatus, 60000); // Check every minute
@@ -1147,5 +1238,17 @@
         fetchOUTree();
         setInterval(fetchReports, 30000); // Refresh reports every 30 seconds
     </script>
+
+    <!-- What's New modal -->
+    <div id="changelogModal" class="modal-overlay" onclick="if(event.target===this)closeChangelog()">
+        <div class="modal-card">
+            <div class="modal-header">
+                <h2>What's New</h2>
+                <button type="button" class="modal-close" onclick="closeChangelog()" aria-label="Close">&times;</button>
+            </div>
+            <div id="changelogBody" class="modal-body">Loading...</div>
+        </div>
+    </div>
+    <script src="https://cdn.jsdelivr.net/npm/marked@12.0.0/marked.min.js"></script>
 </body>
 </html>

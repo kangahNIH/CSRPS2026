@@ -79,10 +79,74 @@ $outputColumns = @('ObjectClass') + @($properties | Where-Object { $_ -ne 'Objec
 # contacts, managed service accounts, etc.) — not the OU containers themselves.
 $ldapFilter = '(!(objectClass=organizationalUnit))'
 
+# Get-ADObject only accepts raw LDAP attribute names. The legacy Get-ADUser cmdlet
+# exposed many friendly/computed properties (Enabled, PasswordLastSet, EmailAddress,
+# ...) that have no direct LDAP counterpart. We map those to the underlying LDAP
+# attribute(s) for the query, then derive the friendly value when building the row.
+$friendlyAttrMap = @{
+    'Enabled'                = @('userAccountControl')
+    'PasswordLastSet'        = @('pwdLastSet')
+    'PasswordNeverExpires'   = @('userAccountControl')
+    'PasswordNotRequired'    = @('userAccountControl')
+    'SmartcardLogonRequired' = @('userAccountControl')
+    'AccountExpirationDate'  = @('accountExpires')
+    'LastLogonDate'          = @('lastLogonTimestamp')
+    'LockedOut'              = @('lockoutTime')
+    'EmailAddress'           = @('mail')
+    'OfficePhone'            = @('telephoneNumber')
+    'MobilePhone'            = @('mobile')
+    'HomePage'               = @('wWWHomePage')
+    'Surname'                = @('sn')
+    'GivenName'              = @('givenName')
+    'Office'                 = @('physicalDeliveryOfficeName')
+    'Country'                = @('c')
+    'BadLogonCount'          = @('badPwdCount')
+    'ServicePrincipalNames'  = @('servicePrincipalName')
+}
+
+# UAC bit masks for computed flags
+$UAC_ACCOUNTDISABLE      = 0x0002
+$UAC_PASSWD_NOTREQD      = 0x0020
+$UAC_DONT_EXPIRE_PASSWORD= 0x10000
+$UAC_SMARTCARD_REQUIRED  = 0x40000
+
+# Build the actual LDAP attribute list we need to fetch (deduplicated).
+$ldapAttrSet = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
+foreach ($p in $outputColumns) {
+    if ($friendlyAttrMap.ContainsKey($p)) {
+        foreach ($a in $friendlyAttrMap[$p]) { [void]$ldapAttrSet.Add($a) }
+    } else {
+        [void]$ldapAttrSet.Add($p)
+    }
+}
+$ldapAttrs = @($ldapAttrSet)
+
+# Translate one row's LDAP values into a friendly column value.
+function Get-FriendlyValue {
+    param($obj, [string]$friendlyName)
+    switch ($friendlyName) {
+        'Enabled'                { $uac = $obj.userAccountControl; if ($null -eq $uac) { return $null }; return -not [bool]($uac -band $UAC_ACCOUNTDISABLE) }
+        'PasswordNeverExpires'   { $uac = $obj.userAccountControl; if ($null -eq $uac) { return $null }; return [bool]($uac -band $UAC_DONT_EXPIRE_PASSWORD) }
+        'PasswordNotRequired'    { $uac = $obj.userAccountControl; if ($null -eq $uac) { return $null }; return [bool]($uac -band $UAC_PASSWD_NOTREQD) }
+        'SmartcardLogonRequired' { $uac = $obj.userAccountControl; if ($null -eq $uac) { return $null }; return [bool]($uac -band $UAC_SMARTCARD_REQUIRED) }
+        'PasswordLastSet'        { $ft = $obj.pwdLastSet;          if (-not $ft -or $ft -eq 0) { return $null }; return [DateTime]::FromFileTime([int64]$ft) }
+        'LastLogonDate'          { $ft = $obj.lastLogonTimestamp;  if (-not $ft -or $ft -eq 0) { return $null }; return [DateTime]::FromFileTime([int64]$ft) }
+        'AccountExpirationDate'  { $ft = $obj.accountExpires;      if (-not $ft -or $ft -eq 0 -or [int64]$ft -eq [int64]::MaxValue) { return $null }; return [DateTime]::FromFileTime([int64]$ft) }
+        'LockedOut'              { $lt = $obj.lockoutTime;         return ($lt -and [int64]$lt -gt 0) }
+        default {
+            # For aliased single-attr maps, read the LDAP value directly.
+            if ($friendlyAttrMap.ContainsKey($friendlyName)) {
+                return $obj.($friendlyAttrMap[$friendlyName][0])
+            }
+            return $obj.$friendlyName
+        }
+    }
+}
+
 try {
     # Query all non-OU objects recursively within the OU. Get-ADObject works across
     # all schema classes, unlike Get-ADUser which only returns user objects.
-    $accounts = Get-ADObject -LDAPFilter $ldapFilter -SearchBase $ouDN -SearchScope Subtree -Properties $properties @adParams
+    $accounts = Get-ADObject -LDAPFilter $ldapFilter -SearchBase $ouDN -SearchScope Subtree -Properties $ldapAttrs @adParams
 
     $totalAccounts = ($accounts | Measure-Object).Count
     Update-RequestStatus -status "Processing" -message "Found $totalAccounts objects. Building CSV..."
@@ -92,12 +156,12 @@ try {
         exit
     }
 
-    # Build report rows
+    # Build report rows using friendly column names; values are translated per-attribute.
     $counter = 1
     $reportData = $accounts | Sort-Object Name | ForEach-Object {
         $row = [ordered]@{ "No." = $counter++ }
         foreach ($prop in $outputColumns) {
-            $val = $_.$prop
+            $val = Get-FriendlyValue -obj $_ -friendlyName $prop
             if ($val -is [System.Collections.ICollection] -and $val -isnot [string]) {
                 $row[$prop] = ($val -join "; ")
             } else {
