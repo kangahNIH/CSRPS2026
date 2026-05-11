@@ -1,5 +1,7 @@
 # Export-OUProperties.ps1
-# Samples accounts in a specific OU and discovers which AD properties have actual content.
+# Samples objects in a specific OU (users, computers, groups, contacts, managed
+# service accounts, etc. — nested OUs excluded) and discovers which AD properties
+# have actual content. Uses Get-ADObject so it works across all schema classes.
 # Uploads result to Azure Blob: config/ou-props/{sanitizedDN}.json
 # Called on-demand when a user selects an OU in the OU Browser.
 
@@ -41,20 +43,19 @@ function Update-RequestStatus {
     }
 }
 
-# Candidate properties to probe (common AD user attributes)
-$candidateProperties = @(
-    'SamAccountName','Name','DisplayName','GivenName','Surname',
-    'Description','Title','Department','Company','Division',
-    'Office','OfficePhone','MobilePhone','EmailAddress','HomePage',
-    'Manager','StreetAddress','City','State','Country','PostalCode',
-    'Enabled','PasswordLastSet','PasswordNeverExpires','PasswordNotRequired',
-    'CannotChangePassword','AccountExpirationDate','SmartcardLogonRequired',
-    'LastLogonDate','LogonCount','BadLogonCount','LockedOut',
-    'WhenCreated','WhenChanged',
-    'DistinguishedName','UserPrincipalName','ObjectGUID',
-    'MemberOf','ServicePrincipalNames',
-    'HomeDirectory','HomeDrive','ProfilePath','ScriptPath'
+# Fallback property list used only when the OU is empty. Includes attributes
+# common across users, computers, and groups so the UI has something to show.
+$fallbackProperties = @(
+    'Name','SamAccountName','DisplayName','Description',
+    'DistinguishedName','ObjectClass','ObjectGUID','WhenCreated','WhenChanged'
 )
+
+# AD attributes that are noisy, internal, or huge and shouldn't be offered to users.
+$excludedProperties = @(
+    'nTSecurityDescriptor','msDS-AllowedToActOnBehalfOfOtherIdentity',
+    'msExchMailboxSecurityDescriptor','PropertyNames','PropertyCount',
+    'AddedProperties','RemovedProperties','ModifiedProperties','DistinguishedName'
+) | ForEach-Object { $_.ToLower() }
 
 Update-RequestStatus -status "Processing" -message "Scanning OU properties for: $ouDN"
 
@@ -65,36 +66,45 @@ try {
     exit 1
 }
 
+# Exclude nested OUs — we want leaf objects (users, computers, groups, MSAs, contacts, ...).
+$ldapFilter = '(!(objectClass=organizationalUnit))'
+
 try {
-    # Sample up to $SampleSize accounts from the OU (recursive)
-    $accounts = Get-ADUser -Filter * -SearchBase $ouDN -SearchScope Subtree `
-        -Properties $candidateProperties -Server "nih.gov" -ErrorAction Stop |
+    # Sample up to $SampleSize objects from the OU (recursive). Get-ADObject with
+    # -Properties * returns every populated attribute, so we can discover the real
+    # schema in use rather than guessing from a hardcoded candidate list.
+    $accounts = Get-ADObject -LDAPFilter $ldapFilter -SearchBase $ouDN -SearchScope Subtree `
+        -Properties * -Server "nih.gov" -ErrorAction Stop |
         Select-Object -First $SampleSize
 
-    $totalAccounts = (Get-ADUser -Filter * -SearchBase $ouDN -SearchScope Subtree `
+    $totalAccounts = (Get-ADObject -LDAPFilter $ldapFilter -SearchBase $ouDN -SearchScope Subtree `
         -Server "nih.gov" -ErrorAction SilentlyContinue | Measure-Object).Count
 
     $sampledCount = ($accounts | Measure-Object).Count
 
     if ($sampledCount -eq 0) {
-        Update-RequestStatus -status "Completed" -message "No accounts found in OU. Showing all candidate properties."
-        $populatedProperties = $candidateProperties
+        Update-RequestStatus -status "Completed" -message "No objects found in OU. Showing fallback property list."
+        $populatedProperties = $fallbackProperties
     } else {
-        Update-RequestStatus -status "Processing" -message "Sampled $sampledCount of $totalAccounts accounts. Discovering non-empty properties..."
+        Update-RequestStatus -status "Processing" -message "Sampled $sampledCount of $totalAccounts objects. Discovering non-empty properties..."
 
-        # Find properties that have at least one non-null, non-empty value in the sample
-        $populatedProperties = @()
-        foreach ($prop in $candidateProperties) {
-            $hasValue = $accounts | Where-Object {
-                $val = $_.$prop
-                if ($null -eq $val) { return $false }
-                if ($val -is [System.Collections.ICollection]) { return $val.Count -gt 0 }
-                return ($val.ToString().Trim() -ne "")
-            }
-            if ($hasValue) {
-                $populatedProperties += $prop
+        # Walk every sampled object and collect the union of property names that
+        # have a real value. This covers mixed-type OUs (e.g., users + groups + MSAs).
+        $populatedSet = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
+        foreach ($obj in $accounts) {
+            foreach ($prop in $obj.PSObject.Properties) {
+                if ($excludedProperties -contains $prop.Name.ToLower()) { continue }
+                $val = $prop.Value
+                if ($null -eq $val) { continue }
+                if ($val -is [System.Collections.ICollection] -and $val -isnot [string]) {
+                    if ($val.Count -le 0) { continue }
+                } elseif ($val.ToString().Trim() -eq '') {
+                    continue
+                }
+                [void]$populatedSet.Add($prop.Name)
             }
         }
+        $populatedProperties = $populatedSet | Sort-Object
     }
 
     # Extract a friendly name from the OU DN

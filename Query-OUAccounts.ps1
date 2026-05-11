@@ -1,6 +1,8 @@
 # Query-OUAccounts.ps1
-# Queries all user accounts within a specified OU (recursively) with user-selected
-# AD attributes and exports a CSV named {OUName}_{timestamp}.csv to Azure Blob Storage.
+# Queries all objects within a specified OU (recursively) — users, computers, groups,
+# contacts, managed service accounts, etc. — with user-selected AD attributes and
+# exports a CSV named {OUName}_{timestamp}.csv to Azure Blob Storage.
+# Nested organizational units are excluded; everything else is included.
 # Triggered by the Polling script on the Jump Server (CSRMGMT02).
 
 param (
@@ -11,7 +13,7 @@ param (
     [string]$ouDN = "OU=CSR,OU=NIH,OU=AD,DC=nih,DC=gov",
 
     [Parameter(Mandatory=$false)]
-    [string]$selectedProperties = "SamAccountName,Name,DisplayName,Description,Enabled,PasswordLastSet,LastLogonDate,WhenCreated,DistinguishedName"
+    [string]$selectedProperties = "Name,SamAccountName,DisplayName,Description,WhenCreated,DistinguishedName"
 )
 
 $script:statusHistory = @()
@@ -68,15 +70,25 @@ if (-not (Test-Path -Path $reportPath)) {
 
 $adParams = @{ ErrorAction = 'Stop'; Server = "nih.gov" }
 
+# Ensure ObjectClass is always included so users can see what type each row is.
+# Get-ADObject returns ObjectClass by default, but listing it explicitly guarantees
+# it appears as a column even if the user didn't pick it.
+$outputColumns = @('ObjectClass') + @($properties | Where-Object { $_ -ne 'ObjectClass' })
+
+# Filter out nested OUs so we only return leaf objects (users, computers, groups,
+# contacts, managed service accounts, etc.) — not the OU containers themselves.
+$ldapFilter = '(!(objectClass=organizationalUnit))'
+
 try {
-    # Query all users recursively within the OU
-    $accounts = Get-ADUser -Filter * -SearchBase $ouDN -SearchScope Subtree -Properties $properties @adParams
+    # Query all non-OU objects recursively within the OU. Get-ADObject works across
+    # all schema classes, unlike Get-ADUser which only returns user objects.
+    $accounts = Get-ADObject -LDAPFilter $ldapFilter -SearchBase $ouDN -SearchScope Subtree -Properties $properties @adParams
 
     $totalAccounts = ($accounts | Measure-Object).Count
-    Update-RequestStatus -status "Processing" -message "Found $totalAccounts accounts. Building CSV..."
+    Update-RequestStatus -status "Processing" -message "Found $totalAccounts objects. Building CSV..."
 
     if ($totalAccounts -eq 0) {
-        Update-RequestStatus -status "Completed" -message "No user accounts found in OU: $ouShortName"
+        Update-RequestStatus -status "Completed" -message "No objects found in OU: $ouShortName"
         exit
     }
 
@@ -84,9 +96,9 @@ try {
     $counter = 1
     $reportData = $accounts | Sort-Object Name | ForEach-Object {
         $row = [ordered]@{ "No." = $counter++ }
-        foreach ($prop in $properties) {
+        foreach ($prop in $outputColumns) {
             $val = $_.$prop
-            if ($val -is [System.Collections.ICollection]) {
+            if ($val -is [System.Collections.ICollection] -and $val -isnot [string]) {
                 $row[$prop] = ($val -join "; ")
             } else {
                 $row[$prop] = $val
