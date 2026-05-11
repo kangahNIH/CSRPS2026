@@ -33,6 +33,14 @@ URL: https://csrst-ps-adm-app-egcbevftg6fjd0fu.eastus2-01.azurewebsites.net/
 - Excludes noisy/internal attrs (`nTSecurityDescriptor`, etc.) from the discoverable property list.
 - Deployment: PS1 files uploaded directly to `scripts` blob container; Jump Server picks them up on next 10-min sync.
 
+### 2026-05-11 — OU Browser: faster scans, object-class breakdown, empty-OU clarity
+- **Fix**: First-time scans on Server2016 / Server2019 were leaving the property picker blank for an extended period. Replaced `Get-ADObject -Properties *` (which fetched every attribute including security descriptors) with a curated candidate list and added `-ResultSetSize $SampleSize` for server-side limiting. Scans now finish noticeably faster.
+- **New**: The selected-OU info banner now shows an object-class breakdown of the sample (e.g., "30 object(s) (subtree): 26 computer, 4 user"). Makes it obvious what kind of objects a parent OU like `Servers` actually contains.
+- **New**: When an OU contains zero eligible objects, the picker now shows a clear red message explaining that nested sub-OUs and AD plumbing (DFSR, SCPs, etc.) are excluded by design, and the Generate Report button is disabled. No more silently empty UI.
+- **New**: Hint under "Select Attributes to Include" explains that reports cover the selected OU **and all sub-OUs recursively**. Picking a parent like `Servers` includes every descendant.
+- Property scan result JSON now includes `objectClassCounts`, `isEmpty`, and `searchScope` fields.
+- Friendly synthetic property names (`Enabled`, `PasswordLastSet`, `LastLogonDate`, `EmailAddress`, `AccountExpirationDate`, etc.) are auto-added to the picker when the underlying LDAP attribute is populated in the sample. `Query-OUAccounts.ps1`'s existing translation layer turns them into readable column values at report time.
+
 ### 2026-05-11 — OU report: hide AD infrastructure objects
 - **Fix**: Reports for OUs like `Servers 2022` were including ~89 rows instead of the 46 real computer objects shown in Active Directory Users and Computers. The extra rows came from infrastructure objects that ADUC hides by default — DFSR replication metadata (`msDFSR-Subscription`, `msDFSR-Subscriber`, `msDFSR-LocalSettings`), Service Connection Points that Windows VMs auto-register (`serviceConnectionPoint`), legacy FRS objects, internal `CN=` containers, etc.
 - Both `Query-OUAccounts.ps1` and `Export-OUProperties.ps1` now apply an LDAP exclusion filter for these well-known plumbing classes. Result matches what users actually see in ADUC.

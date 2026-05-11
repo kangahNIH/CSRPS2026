@@ -438,7 +438,7 @@
                 </div>
                 <div style="display: flex; align-items: center;">
                     <button type="button" class="whats-new-link" onclick="openChangelog()">What's New</button>
-                    <span class="version-tag">v.2026-05-11-ou-tree-ux</span>
+                    <span class="version-tag">v.2026-05-11-ou-breakdown</span>
                 </div>
             </div>
 
@@ -542,6 +542,11 @@
                             <button type="button" onclick="toggleAllOUProps(true)">Select All</button>
                             <button type="button" onclick="toggleAllOUProps(false)">Deselect All</button>
                         </div>
+                    </div>
+                    <div class="hint" style="margin-bottom: 8px;">
+                        Reports cover the selected OU <b>and all sub-OUs recursively</b>. Picking a parent like
+                        <code>Servers</code> includes <code>Server2016</code>, <code>Server2019</code>, etc.
+                        AD plumbing objects (DFSR metadata, SCPs, internal containers) are always excluded.
                     </div>
                     <div id="ouPropertyGrid" class="property-grid">
                         <div style="grid-column:1/-1; color:#605e5c;">Select an OU above to see available properties.</div>
@@ -1164,11 +1169,46 @@
 
         function renderOUPropertyGrid(data) {
             const grid = document.getElementById('ouPropertyGrid');
+            const info = document.getElementById('ouSelectedInfo');
+            const submitBtn = document.getElementById('ouSubmitBtn');
             const props = data.properties || [];
-            if (props.length === 0) {
-                grid.innerHTML = '<div style="grid-column:1/-1;">No populated properties found in this OU.</div>';
+
+            // Update the selected-OU info banner with an object-class breakdown
+            // (e.g., "26 computer, 4 user") and a scope hint.
+            if (info && data.ou) {
+                const counts = data.objectClassCounts || {};
+                const breakdown = Object.keys(counts)
+                    .sort((a, b) => counts[b] - counts[a])
+                    .map(k => `${counts[k]} ${k}`)
+                    .join(', ');
+                const total = (typeof data.totalAccounts === 'number') ? data.totalAccounts : '?';
+                let extra = '';
+                if (data.isEmpty) {
+                    extra = ` &mdash; <span style="color:#a4262c;">no eligible objects</span>`;
+                } else if (breakdown) {
+                    extra = ` &mdash; ${total} object${total === 1 ? '' : 's'} (subtree): <span style="color:#605e5c;">${breakdown}</span>`;
+                }
+                info.innerHTML =
+                    `<b>${data.ouFriendlyName || ''}</b> &mdash; DN: <code style="font-size:0.75rem;">${data.ou}</code>${extra}`;
+            }
+
+            // Empty OU: no objects to report on. Hide the picker, show explainer,
+            // and disable the Generate Report button.
+            if (data.isEmpty || props.length === 0) {
+                grid.innerHTML = `
+                    <div style="grid-column:1/-1; padding: 12px; background:#fff4f4; border:1px solid #f3c2c2; border-radius:4px; color:#a4262c;">
+                        <b>This OU contains no eligible objects.</b><br>
+                        <span style="font-size:0.8rem; color:#605e5c;">
+                            The OU Browser excludes nested sub-OUs and AD infrastructure objects
+                            (DFSR replication metadata, Service Connection Points, internal containers, etc.).
+                            Pick a different OU or one of its sub-OUs that has accounts.
+                        </span>
+                    </div>`;
+                submitBtn.disabled = true;
+                submitBtn.style.opacity = '0.5';
                 return;
             }
+
             grid.innerHTML = props.map(prop => {
                 const checked = OU_DEFAULT_PROPS.includes(prop) ? 'checked' : '';
                 return `<div class="property-item">
@@ -1177,8 +1217,8 @@
                 </div>`;
             }).join('');
             // Enable submit button
-            document.getElementById('ouSubmitBtn').disabled = false;
-            document.getElementById('ouSubmitBtn').style.opacity = '1';
+            submitBtn.disabled = false;
+            submitBtn.style.opacity = '1';
         }
 
         function toggleAllOUProps(selectAll) {

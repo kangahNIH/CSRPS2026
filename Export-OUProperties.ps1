@@ -1,7 +1,8 @@
 # Export-OUProperties.ps1
 # Samples objects in a specific OU (users, computers, groups, contacts, managed
-# service accounts, etc. — nested OUs excluded) and discovers which AD properties
-# have actual content. Uses Get-ADObject so it works across all schema classes.
+# service accounts, etc. — nested OUs and AD plumbing excluded) and discovers
+# which AD properties have actual content. Uses Get-ADObject so it works across
+# all schema classes.
 # Uploads result to Azure Blob: config/ou-props/{sanitizedDN}.json
 # Called on-demand when a user selects an OU in the OU Browser.
 
@@ -43,19 +44,58 @@ function Update-RequestStatus {
     }
 }
 
-# Fallback property list used only when the OU is empty. Includes attributes
-# common across users, computers, and groups so the UI has something to show.
-$fallbackProperties = @(
-    'Name','SamAccountName','DisplayName','Description',
-    'DistinguishedName','ObjectClass','ObjectGUID','WhenCreated','WhenChanged'
+# Curated candidate property list. LDAP-native attribute names that Get-ADObject
+# accepts across users, computers, groups, contacts, and MSAs. Avoids the slowness
+# of -Properties * (which fetches the entire object including security descriptors).
+$candidateProperties = @(
+    # Identity
+    'Name','SamAccountName','DisplayName','UserPrincipalName','Description',
+    'DistinguishedName','ObjectClass','ObjectGUID','ObjectSid','CanonicalName',
+    # Lifecycle
+    'WhenCreated','WhenChanged',
+    # Authentication / account flags (raw LDAP)
+    'userAccountControl','pwdLastSet','lastLogonTimestamp','accountExpires',
+    'lockoutTime','logonCount','badPwdCount',
+    # Contact / person
+    'givenName','sn','mail','telephoneNumber','mobile','info',
+    'title','department','company','manager','employeeID','employeeType',
+    'physicalDeliveryOfficeName','streetAddress','l','st','postalCode','c','co',
+    # Group
+    'groupType','member','memberOf','managedBy',
+    # Computer
+    'dNSHostName','operatingSystem','operatingSystemVersion','operatingSystemServicePack',
+    'servicePrincipalName','primaryGroupID','location',
+    # MSA / gMSA
+    'msDS-ManagedPasswordInterval','msDS-HostServiceAccount','msDS-GroupMSAMembership',
+    'msDS-SupportedEncryptionTypes',
+    # Home / profile
+    'homeDirectory','homeDrive','profilePath','scriptPath'
 )
 
-# AD attributes that are noisy, internal, or huge and shouldn't be offered to users.
-$excludedProperties = @(
-    'nTSecurityDescriptor','msDS-AllowedToActOnBehalfOfOtherIdentity',
-    'msExchMailboxSecurityDescriptor','PropertyNames','PropertyCount',
-    'AddedProperties','RemovedProperties','ModifiedProperties','DistinguishedName'
-) | ForEach-Object { $_.ToLower() }
+# Friendly synthetic properties — surfaced in the UI when the underlying LDAP
+# attribute is populated. Query-OUAccounts.ps1 translates these back to LDAP at
+# query time and converts the raw value into a readable form (DateTime, bool, etc).
+$syntheticByLdapAttr = @{
+    'userAccountControl' = @('Enabled','PasswordNeverExpires','PasswordNotRequired','SmartcardLogonRequired')
+    'pwdLastSet'         = @('PasswordLastSet')
+    'lastLogonTimestamp' = @('LastLogonDate')
+    'accountExpires'     = @('AccountExpirationDate')
+    'lockoutTime'        = @('LockedOut')
+    'mail'               = @('EmailAddress')
+    'telephoneNumber'    = @('OfficePhone')
+    'mobile'             = @('MobilePhone')
+    'sn'                 = @('Surname')
+    'physicalDeliveryOfficeName' = @('Office')
+    'c'                  = @('Country')
+    'badPwdCount'        = @('BadLogonCount')
+    'servicePrincipalName' = @('ServicePrincipalNames')
+}
+
+# Always-offered properties (even if the OU is empty) so the picker isn't blank.
+$fallbackProperties = @(
+    'Name','SamAccountName','DisplayName','Description','ObjectClass',
+    'DistinguishedName','ObjectGUID','WhenCreated','WhenChanged'
+)
 
 Update-RequestStatus -status "Processing" -message "Scanning OU properties for: $ouDN"
 
@@ -67,7 +107,7 @@ try {
 }
 
 # Exclude nested OUs and AD infrastructure plumbing (DFSR replication metadata,
-# SCPs registered by VMs, legacy FRS objects, internal CN= containers). Keeping
+# SCPs registered by VMs, legacy FRS objects, internal CN= containers). Keeps
 # the filter in sync with Query-OUAccounts.ps1 so the property scan reflects the
 # same population the actual report will produce.
 $excludedClasses = @(
@@ -82,40 +122,67 @@ $excludedClasses = @(
 $ldapFilter = '(&' + (($excludedClasses | ForEach-Object { "(!(objectClass=$_))" }) -join '') + ')'
 
 try {
-    # Sample up to $SampleSize objects from the OU (recursive). Get-ADObject with
-    # -Properties * returns every populated attribute, so we can discover the real
-    # schema in use rather than guessing from a hardcoded candidate list.
-    $accounts = Get-ADObject -LDAPFilter $ldapFilter -SearchBase $ouDN -SearchScope Subtree `
-        -Properties * -Server "nih.gov" -ErrorAction Stop |
-        Select-Object -First $SampleSize
+    # ResultSetSize limits the server-side LDAP page, so we don't drag the whole
+    # subtree across the wire just to keep the first 50.
+    $accounts = @(Get-ADObject -LDAPFilter $ldapFilter -SearchBase $ouDN -SearchScope Subtree `
+        -ResultSetSize $SampleSize -Properties $candidateProperties `
+        -Server "nih.gov" -ErrorAction Stop)
 
+    # Total count (no -Properties, no result limit) — used to tell the user how
+    # representative the sample is.
     $totalAccounts = (Get-ADObject -LDAPFilter $ldapFilter -SearchBase $ouDN -SearchScope Subtree `
         -Server "nih.gov" -ErrorAction SilentlyContinue | Measure-Object).Count
 
-    $sampledCount = ($accounts | Measure-Object).Count
+    $sampledCount = $accounts.Count
+
+    # Count objects by ObjectClass so the UI can show a breakdown like
+    # "26 computer, 4 user". Helps users understand what a parent-OU sample contains.
+    $classCounts = @{}
+    foreach ($obj in $accounts) {
+        $cls = $obj.ObjectClass
+        if ($cls) {
+            if ($classCounts.ContainsKey($cls)) { $classCounts[$cls] = $classCounts[$cls] + 1 }
+            else { $classCounts[$cls] = 1 }
+        }
+    }
+
+    $isEmpty = ($totalAccounts -eq 0)
 
     if ($sampledCount -eq 0) {
-        Update-RequestStatus -status "Completed" -message "No objects found in OU. Showing fallback property list."
-        $populatedProperties = $fallbackProperties
+        if ($isEmpty) {
+            Update-RequestStatus -status "Completed" -message "OU is empty — no eligible objects found. Sub-OUs and AD infrastructure objects (DFSR, SCPs, etc.) are excluded by design."
+        } else {
+            Update-RequestStatus -status "Completed" -message "Sampled 0 of $totalAccounts objects. Returning fallback property list."
+        }
+        $populatedProperties = if ($isEmpty) { @() } else { $fallbackProperties }
     } else {
-        Update-RequestStatus -status "Processing" -message "Sampled $sampledCount of $totalAccounts objects. Discovering non-empty properties..."
+        Update-RequestStatus -status "Processing" -message "Sampled $sampledCount of $totalAccounts objects. Discovering populated properties..."
 
-        # Walk every sampled object and collect the union of property names that
-        # have a real value. This covers mixed-type OUs (e.g., users + groups + MSAs).
+        # Collect the union of populated LDAP attributes across the sample.
         $populatedSet = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
         foreach ($obj in $accounts) {
-            foreach ($prop in $obj.PSObject.Properties) {
-                if ($excludedProperties -contains $prop.Name.ToLower()) { continue }
-                $val = $prop.Value
+            foreach ($candidate in $candidateProperties) {
+                $val = $obj.$candidate
                 if ($null -eq $val) { continue }
                 if ($val -is [System.Collections.ICollection] -and $val -isnot [string]) {
                     if ($val.Count -le 0) { continue }
                 } elseif ($val.ToString().Trim() -eq '') {
                     continue
                 }
-                [void]$populatedSet.Add($prop.Name)
+                [void]$populatedSet.Add($candidate)
             }
         }
+
+        # Add friendly synthetic property names whose underlying LDAP attr is populated.
+        # Query-OUAccounts.ps1 knows how to decode these into readable column values.
+        foreach ($ldapAttr in $syntheticByLdapAttr.Keys) {
+            if ($populatedSet.Contains($ldapAttr)) {
+                foreach ($synth in $syntheticByLdapAttr[$ldapAttr]) {
+                    [void]$populatedSet.Add($synth)
+                }
+            }
+        }
+
         $populatedProperties = $populatedSet | Sort-Object
     }
 
@@ -132,6 +199,9 @@ try {
         totalAccounts   = $totalAccounts
         sampleSize      = $sampledCount
         properties      = $populatedProperties
+        objectClassCounts = $classCounts
+        isEmpty         = $isEmpty
+        searchScope     = 'Subtree'
         lastUpdated     = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")
     }
 
@@ -148,7 +218,12 @@ try {
             --connection-string $ConnectionString `
             --overwrite --output none --auth-mode key --only-show-errors --no-progress
 
-        Update-RequestStatus -status "Completed" -message "Property scan complete: $($populatedProperties.Count) properties with content found in $ouFriendlyName ($totalAccounts accounts total)"
+        if ($isEmpty) {
+            Update-RequestStatus -status "Completed" -message "$ouFriendlyName is empty (0 eligible objects). The OU Browser will show this clearly."
+        } else {
+            $breakdown = ($classCounts.GetEnumerator() | Sort-Object -Property Value -Descending | ForEach-Object { "$($_.Value) $($_.Name)" }) -join ', '
+            Update-RequestStatus -status "Completed" -message "Property scan complete: $($populatedProperties.Count) properties found in $ouFriendlyName. Sample breakdown: $breakdown. (Total objects in subtree: $totalAccounts)"
+        }
     } else {
         Update-RequestStatus -status "Completed" -message "Property scan complete (saved locally): $($populatedProperties.Count) properties found."
     }
