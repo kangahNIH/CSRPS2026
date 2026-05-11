@@ -33,6 +33,12 @@ URL: https://csrst-ps-adm-app-egcbevftg6fjd0fu.eastus2-01.azurewebsites.net/
 - Excludes noisy/internal attrs (`nTSecurityDescriptor`, etc.) from the discoverable property list.
 - Deployment: PS1 files uploaded directly to `scripts` blob container; Jump Server picks them up on next 10-min sync.
 
+### 2026-05-11 — OU report: also exclude GPO crypto-policy "contact" stubs
+- **Fix**: The Server2016 report still showed 8 `contact`-class rows with names like `CryptoPolicy` (Description `EncryptThenMac`) and bare GUIDs. These aren't real contacts — they're GPO-deployed TLS/Schannel cipher policy stubs that Windows stores as `contact` objects under the OU so domain-joined machines can discover the policy. ADUC hides them by default.
+- Added `contact` and `foreignSecurityPrincipal` to the default exclusion list in both `Query-OUAccounts.ps1` and `Export-OUProperties.ps1`.
+- After the change, Server2016 returns ~36 rows instead of 44 — just the actual computer objects.
+- If a future OU legitimately needs real contact objects in reports, we can add a UI toggle to override.
+
 ### 2026-05-11 — OU Browser: faster scans, object-class breakdown, empty-OU clarity
 - **Fix**: First-time scans on Server2016 / Server2019 were leaving the property picker blank for an extended period. Replaced `Get-ADObject -Properties *` (which fetched every attribute including security descriptors) with a curated candidate list and added `-ResultSetSize $SampleSize` for server-side limiting. Scans now finish noticeably faster.
 - **New**: The selected-OU info banner now shows an object-class breakdown of the sample (e.g., "30 object(s) (subtree): 26 computer, 4 user"). Makes it obvious what kind of objects a parent OU like `Servers` actually contains.

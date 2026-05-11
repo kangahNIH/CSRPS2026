@@ -106,13 +106,17 @@ try {
     exit 1
 }
 
-# Exclude nested OUs and AD infrastructure plumbing (DFSR replication metadata,
-# SCPs registered by VMs, legacy FRS objects, internal CN= containers). Keeps
-# the filter in sync with Query-OUAccounts.ps1 so the property scan reflects the
-# same population the actual report will produce.
+# Exclude nested OUs and AD infrastructure plumbing — DFSR replication metadata,
+# SCPs registered by VMs, legacy FRS objects, internal CN= containers, GPO-deployed
+# cryptographic/Schannel policy stubs stored as 'contact' objects, and foreign
+# security principals from external trusts. Keeps the filter in sync with
+# Query-OUAccounts.ps1 so the property scan reflects the same population the
+# actual report will produce.
 $excludedClasses = @(
     'organizationalUnit',
     'container',
+    'contact',                  # GPO crypto policy stubs (EncryptThenMac etc.) — hidden by ADUC
+    'foreignSecurityPrincipal',
     'msDFSR-Subscription','msDFSR-Subscriber','msDFSR-LocalSettings',
     'msDFSR-Topology','msDFSR-Content','msDFSR-ContentSet','msDFSR-Member',
     'serviceConnectionPoint',

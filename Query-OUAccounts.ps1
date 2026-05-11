@@ -77,13 +77,15 @@ $outputColumns = @('ObjectClass') + @($properties | Where-Object { $_ -ne 'Objec
 
 # Filter out nested OUs and AD infrastructure objects (DFSR replication metadata,
 # Service Connection Points registered by VMs, FRS legacy objects, internal CN=
-# containers, etc.). What remains is the same set Active Directory Users and
-# Computers shows by default: users, computers, groups, contacts, MSAs, printers,
-# shared folders, etc. Without this filter, a Servers OU would return ~89 rows
-# instead of the 46 actual computer objects users expect to see.
+# containers, cryptographic policy stubs stored as 'contact' objects, foreign
+# security principals from external trusts, etc.). What remains is the same set
+# Active Directory Users and Computers shows by default: users, computers,
+# groups, MSAs, real contacts with content, printers, shared folders, etc.
 $excludedClasses = @(
     'organizationalUnit',
     'container',
+    'contact',                  # AD-side crypto policy stubs (EncryptThenMac, etc.) get stored as 'contact'
+    'foreignSecurityPrincipal', # SIDs from trusted external domains — not real accounts in this OU
     'msDFSR-Subscription','msDFSR-Subscriber','msDFSR-LocalSettings',
     'msDFSR-Topology','msDFSR-Content','msDFSR-ContentSet','msDFSR-Member',
     'serviceConnectionPoint',
