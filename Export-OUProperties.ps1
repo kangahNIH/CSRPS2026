@@ -66,8 +66,20 @@ try {
     exit 1
 }
 
-# Exclude nested OUs — we want leaf objects (users, computers, groups, MSAs, contacts, ...).
-$ldapFilter = '(!(objectClass=organizationalUnit))'
+# Exclude nested OUs and AD infrastructure plumbing (DFSR replication metadata,
+# SCPs registered by VMs, legacy FRS objects, internal CN= containers). Keeping
+# the filter in sync with Query-OUAccounts.ps1 so the property scan reflects the
+# same population the actual report will produce.
+$excludedClasses = @(
+    'organizationalUnit',
+    'container',
+    'msDFSR-Subscription','msDFSR-Subscriber','msDFSR-LocalSettings',
+    'msDFSR-Topology','msDFSR-Content','msDFSR-ContentSet','msDFSR-Member',
+    'serviceConnectionPoint',
+    'rpcContainer',
+    'nTFRSSubscriber','nTFRSSubscriptions','nTFRSReplicaSet','nTFRSSettings','nTFRSMember'
+)
+$ldapFilter = '(&' + (($excludedClasses | ForEach-Object { "(!(objectClass=$_))" }) -join '') + ')'
 
 try {
     # Sample up to $SampleSize objects from the OU (recursive). Get-ADObject with

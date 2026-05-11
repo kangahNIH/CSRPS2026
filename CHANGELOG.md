@@ -33,6 +33,11 @@ URL: https://csrst-ps-adm-app-egcbevftg6fjd0fu.eastus2-01.azurewebsites.net/
 - Excludes noisy/internal attrs (`nTSecurityDescriptor`, etc.) from the discoverable property list.
 - Deployment: PS1 files uploaded directly to `scripts` blob container; Jump Server picks them up on next 10-min sync.
 
+### 2026-05-11 — OU report: hide AD infrastructure objects
+- **Fix**: Reports for OUs like `Servers 2022` were including ~89 rows instead of the 46 real computer objects shown in Active Directory Users and Computers. The extra rows came from infrastructure objects that ADUC hides by default — DFSR replication metadata (`msDFSR-Subscription`, `msDFSR-Subscriber`, `msDFSR-LocalSettings`), Service Connection Points that Windows VMs auto-register (`serviceConnectionPoint`), legacy FRS objects, internal `CN=` containers, etc.
+- Both `Query-OUAccounts.ps1` and `Export-OUProperties.ps1` now apply an LDAP exclusion filter for these well-known plumbing classes. Result matches what users actually see in ADUC.
+- Generic filter — works for every OU, not just Servers. A Users OU still shows users; a Groups OU still shows groups; nobody sees DFSR/SCP/FRS noise anymore.
+
 ### 2026-05-11 — OU tree UX: visual hierarchy + sticky selection
 - The OU Browser tree now shows folder icons (📁 closed / 📂 open / 📄 leaf), dashed vertical connector lines between parent and children, and a thicker left-bar accent on the selected row — so the hierarchy is obvious at a glance.
 - **Sticky selection**: selecting a deeply-nested OU no longer collapses its ancestors. Expand state is tracked in a JS `Set` that survives every re-render; `selectOU` adds every ancestor DN to that set before redrawing.
